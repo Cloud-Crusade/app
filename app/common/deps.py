@@ -15,6 +15,7 @@ from app.common.db import (
 from app.common.errors import UserNotFoundError
 from app.common.redis import buildRedis
 from app.common.security import decodeToken
+from app.common.sqs import SqsPublisher, getReservationSqsPublisher
 
 bearerScheme = HTTPBearer(
     bearerFormat="JWT",
@@ -44,6 +45,10 @@ async def getReservationReaderSession() -> AsyncIterator[AsyncSession]:
 
 def getRedisClient() -> Redis:
     return buildRedis()
+
+
+def getReservationSqs() -> SqsPublisher:
+    return getReservationSqsPublisher()
 
 
 async def getCurrentUser(

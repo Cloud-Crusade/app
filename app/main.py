@@ -16,7 +16,7 @@ from app.common.exception_handlers import (
     validationErrorHandler,
 )
 from app.common.logging import configureLogging
-from app.routers import auth, events, health, users
+from app.routers import auth, events, health, reservations, users
 from app.settings import settings
 
 configureLogging(env=settings.env)
@@ -44,6 +44,10 @@ app = FastAPI(
         {"name": "auth", "description": "회원가입 · 로그인 · 토큰 갱신"},
         {"name": "users", "description": "사용자 프로필"},
         {"name": "events", "description": "행사 등록 · 조회 · 수정 · 삭제"},
+        {
+            "name": "reservations",
+            "description": "예매 (write 는 SQS 비동기, read 는 동기)",
+        },
         {"name": "health", "description": "헬스체크 (k8s probe · ALB target)"},
     ],
 )
@@ -72,3 +76,4 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(events.router)
+app.include_router(reservations.router)
