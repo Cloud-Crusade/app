@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import StaticPool
 
 from app.common.db import CoreBase
 from app.common.deps import (
@@ -30,14 +31,28 @@ from app.main import app
 
 
 @pytest_asyncio.fixture
-async def coreSession() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+async def coreEngine():
+    # StaticPool + 단일 SQLite in-memory connection 으로 매 세션이 동일 DB 를 본다
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     async with engine.begin() as conn:
         await conn.run_sync(CoreBase.metadata.create_all)
-    factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-    async with factory() as session:
-        yield session
+    yield engine
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def coreSessionFactory(coreEngine):
+    return async_sessionmaker(coreEngine, expire_on_commit=False, class_=AsyncSession)
+
+
+@pytest_asyncio.fixture
+async def coreSession(coreSessionFactory) -> AsyncIterator[AsyncSession]:
+    async with coreSessionFactory() as session:
+        yield session
 
 
 @pytest_asyncio.fixture
@@ -50,20 +65,19 @@ async def redis() -> AsyncIterator:
 
 
 @pytest_asyncio.fixture
-async def client(coreSession, redis) -> AsyncIterator[AsyncClient]:
-    async def _core():
-        yield coreSession
+async def client(coreSessionFactory, redis) -> AsyncIterator[AsyncClient]:
+    # 운영과 동일하게 요청마다 새 세션을 yield — autobegin/명시 begin 충돌 회피
+    async def _core() -> AsyncIterator[AsyncSession]:
+        async with coreSessionFactory() as session:
+            yield session
 
     async def _redis():
         return redis
 
-    async def _stub_session():
-        yield coreSession  # reservation 도 같은 세션으로 stub (인증 도메인 테스트에선 미사용)
-
     app.dependency_overrides[getCoreWriterSession] = _core
     app.dependency_overrides[getCoreReaderSession] = _core
-    app.dependency_overrides[getReservationWriterSession] = _stub_session
-    app.dependency_overrides[getReservationReaderSession] = _stub_session
+    app.dependency_overrides[getReservationWriterSession] = _core
+    app.dependency_overrides[getReservationReaderSession] = _core
     app.dependency_overrides[getRedisClient] = _redis
 
     transport = ASGITransport(app=app)
