@@ -52,3 +52,24 @@ class EventNotFoundError(DomainError):
 
     def __init__(self, *, event_id: str) -> None:
         super().__init__("행사를 찾을 수 없습니다", event_id=event_id)
+
+
+# === Reservation ===
+class ReservationNotFoundError(DomainError):
+    status_code = 404
+    code = "RESERVATION_NOT_FOUND"
+
+    def __init__(self, *, reservation_id: str) -> None:
+        super().__init__("예매를 찾을 수 없습니다", reservation_id=reservation_id)
+
+
+class SeatAlreadyTakenError(DomainError):
+    status_code = 409
+    code = "SEAT_ALREADY_TAKEN"
+
+    def __init__(self, *, event_id: str, reserved_num: int) -> None:
+        super().__init__(
+            "이미 선점된 좌석입니다",
+            event_id=event_id,
+            reserved_num=reserved_num,
+        )
