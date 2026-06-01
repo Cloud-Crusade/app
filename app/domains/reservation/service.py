@@ -92,6 +92,7 @@ class ReservationWriteService:
             )
             await self._sqs.publish(
                 message=message.model_dump(mode="json"),
+                group_id=str(reservation_id),
                 dedup_id=str(reservation_id),
             )
         except Exception:
@@ -115,7 +116,9 @@ class ReservationWriteService:
             reservation_id=reservation_id,
             user_id=user_id,
         )
+        # 같은 reservation 의 create→cancel 이 같은 group → 순서 보장
         await self._sqs.publish(
             message=message.model_dump(mode="json"),
+            group_id=str(reservation_id),
             dedup_id=f"cancel:{reservation_id}",
         )

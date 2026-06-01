@@ -56,10 +56,13 @@ async def test_request_create_publishes_to_sqs_when_seat_free(coreSession, redis
 
     assert reservation_id
     sqs.publish.assert_awaited_once()
-    call = sqs.publish.await_args.kwargs["message"]
-    assert call["action"] == "reservation.create"
-    assert call["reservation_id"] == str(reservation_id)
-    assert call["reserved_num"] == 7
+    kwargs = sqs.publish.await_args.kwargs
+    assert kwargs["group_id"] == str(reservation_id)
+    assert kwargs["dedup_id"] == str(reservation_id)
+    message = kwargs["message"]
+    assert message["action"] == "reservation.create"
+    assert message["reservation_id"] == str(reservation_id)
+    assert message["reserved_num"] == 7
     assert await redis.get(_holdKey(event.event_id, 7)) == str(user_id)
 
 
@@ -135,3 +138,34 @@ async def test_get_by_id_missing_raises(coreSession):
 
     with pytest.raises(ReservationNotFoundError):
         await service.getById(uuid4())
+
+
+@pytest.mark.asyncio
+async def test_request_cancel_publishes_with_group_id(coreSession, redis):
+    from uuid import uuid4
+
+    from app.domains.reservation.model import Reservation
+
+    user_id = uuid4()
+    reservation = Reservation(
+        reservation_id=uuid4(), user_id=user_id, event_id=uuid4(), reserved_num=1,
+    )
+    coreSession.add(reservation)
+    await coreSession.commit()
+
+    sqs = AsyncMock()
+    sqs.publish = AsyncMock(return_value="msg-c")
+    service = ReservationWriteService(
+        core_reader_session=coreSession,
+        reservation_reader_session=coreSession,
+        redis=redis,
+        sqs=sqs,
+    )
+
+    await service.requestCancel(user_id=user_id, reservation_id=reservation.reservation_id)
+
+    sqs.publish.assert_awaited_once()
+    kwargs = sqs.publish.await_args.kwargs
+    assert kwargs["group_id"] == str(reservation.reservation_id)
+    assert kwargs["dedup_id"] == f"cancel:{reservation.reservation_id}"
+    assert kwargs["message"]["action"] == "reservation.cancel"
