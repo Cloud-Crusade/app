@@ -57,7 +57,7 @@ async def test_request_create_publishes_to_sqs_when_seat_free(coreSession, redis
     assert reservation_id
     sqs.publish.assert_awaited_once()
     kwargs = sqs.publish.await_args.kwargs
-    assert kwargs["group_id"] == str(reservation_id)
+    assert kwargs["group_id"] == str(event.event_id)   # 같은 이벤트끼리 group
     assert kwargs["dedup_id"] == str(reservation_id)
     message = kwargs["message"]
     assert message["action"] == "reservation.create"
@@ -166,6 +166,8 @@ async def test_request_cancel_publishes_with_group_id(coreSession, redis):
 
     sqs.publish.assert_awaited_once()
     kwargs = sqs.publish.await_args.kwargs
-    assert kwargs["group_id"] == str(reservation.reservation_id)
+    assert kwargs["group_id"] == str(reservation.event_id)   # 같은 이벤트끼리 group
     assert kwargs["dedup_id"] == f"cancel:{reservation.reservation_id}"
-    assert kwargs["message"]["action"] == "reservation.cancel"
+    message = kwargs["message"]
+    assert message["action"] == "reservation.cancel"
+    assert message["event_id"] == str(reservation.event_id)   # Lambda 가 cross-DB 없이 알 수 있도록

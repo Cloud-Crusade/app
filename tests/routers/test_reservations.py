@@ -40,7 +40,7 @@ async def test_post_reservations_returns_202_with_reservation_id(client, sqsMock
     assert body["reservation_id"]
     sqsMock.publish.assert_awaited_once()
     kwargs = sqsMock.publish.await_args.kwargs
-    assert kwargs["group_id"] == body["reservation_id"]   # FIFO 큐 필수
+    assert kwargs["group_id"] == event_id   # FIFO group_id = event_id
     assert kwargs["dedup_id"] == body["reservation_id"]
     message = kwargs["message"]
     assert message["action"] == "reservation.create"
@@ -133,11 +133,12 @@ async def test_delete_reservation_publishes_cancel(client, sqsMock, coreSession)
     assert response.status_code == 202
     sqsMock.publish.assert_awaited_once()
     kwargs = sqsMock.publish.await_args.kwargs
-    assert kwargs["group_id"] == str(reservation.reservation_id)   # FIFO 큐 필수
+    assert kwargs["group_id"] == str(reservation.event_id)   # FIFO group_id = event_id
     assert kwargs["dedup_id"] == f"cancel:{reservation.reservation_id}"
     message = kwargs["message"]
     assert message["action"] == "reservation.cancel"
     assert message["reservation_id"] == str(reservation.reservation_id)
+    assert message["event_id"] == str(reservation.event_id)
 
 
 @pytest.mark.asyncio

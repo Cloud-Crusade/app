@@ -27,4 +27,5 @@ class ReservationCancelMessage(BaseModel):
     version: int = MESSAGE_VERSION
     reservation_id: UUID
     user_id: UUID
+    event_id: UUID  # Lambda 측 좌석 카운터 보정 및 SQS MessageGroupId 일관성 위해 포함
     issued_at: datetime = Field(default_factory=_now)

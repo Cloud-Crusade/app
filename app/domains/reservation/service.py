@@ -90,9 +90,11 @@ class ReservationWriteService:
                 event_id=payload.event_id,
                 reserved_num=payload.reserved_num,
             )
+            # group_id = event_id → 같은 이벤트의 메시지가 한 group 으로 묶여 순서 보장
+            # (인기 이벤트는 한 group 의 throughput 제한 적용, Lambda 측 좌석 충돌 처리에 유리)
             await self._sqs.publish(
                 message=message.model_dump(mode="json"),
-                group_id=str(reservation_id),
+                group_id=str(payload.event_id),
                 dedup_id=str(reservation_id),
             )
         except Exception:
@@ -115,10 +117,11 @@ class ReservationWriteService:
         message = ReservationCancelMessage(
             reservation_id=reservation_id,
             user_id=user_id,
+            event_id=reservation.event_id,
         )
-        # 같은 reservation 의 create→cancel 이 같은 group → 순서 보장
+        # group_id = event_id → 같은 이벤트의 create→cancel 이 한 group 으로 묶여 순서 보장
         await self._sqs.publish(
             message=message.model_dump(mode="json"),
-            group_id=str(reservation_id),
+            group_id=str(reservation.event_id),
             dedup_id=f"cancel:{reservation_id}",
         )
