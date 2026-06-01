@@ -28,7 +28,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     summary="회원가입",
     responses={
         409: {"description": "이미 사용 중인 사용자 이름"},
-        422: {"description": "요청 검증 실패 (user_name 3~255자, password 8~72자)"},
+        422: {"description": "요청 검증 실패 (user_name ~255자, password ~72자)"},
     },
 )
 async def signup(
