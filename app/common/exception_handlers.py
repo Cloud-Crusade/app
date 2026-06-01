@@ -1,5 +1,5 @@
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
