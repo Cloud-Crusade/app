@@ -7,9 +7,12 @@ os.environ.setdefault("RESERVATION_WRITER_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("RESERVATION_READER_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("JWT_SECRET", "test-secret-" + "x" * 32)
+os.environ.setdefault("SQS_RESERVATION_QUEUE_URL", "http://test/reservation-queue")
 
 from collections.abc import AsyncIterator
+from unittest.mock import AsyncMock
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
@@ -19,12 +22,13 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
-from app.common.db import CoreBase
+from app.common.db import CoreBase, ReservationBase
 from app.common.deps import (
     getCoreReaderSession,
     getCoreWriterSession,
     getRedisClient,
     getReservationReaderSession,
+    getReservationSqs,
     getReservationWriterSession,
 )
 from app.main import app
@@ -40,6 +44,7 @@ async def coreEngine():
     )
     async with engine.begin() as conn:
         await conn.run_sync(CoreBase.metadata.create_all)
+        await conn.run_sync(ReservationBase.metadata.create_all)
     yield engine
     await engine.dispose()
 
@@ -64,8 +69,15 @@ async def redis() -> AsyncIterator:
     await client.aclose()
 
 
+@pytest.fixture
+def sqsMock() -> AsyncMock:
+    publisher = AsyncMock()
+    publisher.publish = AsyncMock(return_value="msg-id-test")
+    return publisher
+
+
 @pytest_asyncio.fixture
-async def client(coreSessionFactory, redis) -> AsyncIterator[AsyncClient]:
+async def client(coreSessionFactory, redis, sqsMock) -> AsyncIterator[AsyncClient]:
     # 운영과 동일하게 요청마다 새 세션을 yield — autobegin/명시 begin 충돌 회피
     async def _core() -> AsyncIterator[AsyncSession]:
         async with coreSessionFactory() as session:
@@ -74,11 +86,15 @@ async def client(coreSessionFactory, redis) -> AsyncIterator[AsyncClient]:
     async def _redis():
         return redis
 
+    def _sqs():
+        return sqsMock
+
     app.dependency_overrides[getCoreWriterSession] = _core
     app.dependency_overrides[getCoreReaderSession] = _core
     app.dependency_overrides[getReservationWriterSession] = _core
     app.dependency_overrides[getReservationReaderSession] = _core
     app.dependency_overrides[getRedisClient] = _redis
+    app.dependency_overrides[getReservationSqs] = _sqs
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
