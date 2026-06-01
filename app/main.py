@@ -43,7 +43,11 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(RequestIdMiddleware)
-installExceptionHandlers(app)
+app.add_exception_handler(DomainError, domainErrorHandler)
+app.add_exception_handler(RequestValidationError, validationErrorHandler)
+app.add_exception_handler(IntegrityError, integrityErrorHandler)
+app.add_exception_handler(Exception, unhandledErrorHandler)
+
 
 app.include_router(health.router)
 app.include_router(auth.router)

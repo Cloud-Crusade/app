@@ -50,10 +50,3 @@ async def unhandledErrorHandler(request: Request, exc: Exception) -> JSONRespons
         status_code=500,
         content={"code": "INTERNAL_ERROR", "message": "예상치 못한 오류"},
     )
-
-
-def installExceptionHandlers(app: FastAPI) -> None:
-    app.add_exception_handler(DomainError, domainErrorHandler)
-    app.add_exception_handler(RequestValidationError, validationErrorHandler)
-    app.add_exception_handler(IntegrityError, integrityErrorHandler)
-    app.add_exception_handler(Exception, unhandledErrorHandler)
