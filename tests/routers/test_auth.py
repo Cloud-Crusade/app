@@ -16,9 +16,10 @@ async def test_signup_returns_201_and_user(client):
 
 
 @pytest.mark.asyncio
-async def test_signup_short_password_returns_422(client):
+async def test_signup_too_long_password_returns_422(client):
+    # schema 는 max_length=72 만 강제 (min_length 없음). 73자 초과 시 422.
     response = await client.post(
-        "/auth/signup", json={"user_name": "alice", "password": "short"},
+        "/auth/signup", json={"user_name": "alice", "password": "p" * 73},
     )
     assert response.status_code == 422
     assert response.json()["code"] == "VALIDATION_ERROR"
