@@ -1,5 +1,6 @@
 import structlog
 from fastapi import Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
@@ -26,12 +27,13 @@ async def domainErrorHandler(request: Request, exc: DomainError) -> JSONResponse
 async def validationErrorHandler(
     request: Request, exc: RequestValidationError,
 ) -> JSONResponse:
+    # Pydantic v2 errors() ctx 에 raw Exception 객체가 들어가 직렬화 실패 → jsonable_encoder 로 우회
     return JSONResponse(
         status_code=422,
         content={
             "code": "VALIDATION_ERROR",
             "message": "요청 검증 실패",
-            "details": exc.errors(),
+            "details": jsonable_encoder(exc.errors()),
         },
     )
 
