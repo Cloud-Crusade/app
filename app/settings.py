@@ -19,5 +19,11 @@ class Settings(BaseSettings):
     jwt_access_ttl_seconds: int = Field(default=1800, alias="JWT_ACCESS_TTL_SECONDS")
     jwt_refresh_ttl_seconds: int = Field(default=1_209_600, alias="JWT_REFRESH_TTL_SECONDS")
 
+    aws_region: str = Field(default="ap-northeast-2", alias="AWS_REGION")
+    aws_endpoint_url: str | None = Field(default=None, alias="AWS_ENDPOINT_URL")
+    sqs_reservation_queue_url: str = Field(..., alias="SQS_RESERVATION_QUEUE_URL")
+
+    seat_hold_ttl_seconds: int = Field(default=300, alias="SEAT_HOLD_TTL_SECONDS")
+
 
 settings = Settings()
