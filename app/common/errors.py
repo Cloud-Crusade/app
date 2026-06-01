@@ -43,3 +43,12 @@ class DuplicateUserNameError(DomainError):
 
     def __init__(self, *, user_name: str) -> None:
         super().__init__("이미 사용 중인 사용자 이름입니다", user_name=user_name)
+
+
+# === Event ===
+class EventNotFoundError(DomainError):
+    status_code = 404
+    code = "EVENT_NOT_FOUND"
+
+    def __init__(self, *, event_id: str) -> None:
+        super().__init__("행사를 찾을 수 없습니다", event_id=event_id)
