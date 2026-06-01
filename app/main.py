@@ -1,4 +1,5 @@
 import uuid
+from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI, Request
@@ -6,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.common.dev_bootstrap import initDevSchemaIfEnabled
 from app.common.errors import DomainError
 from app.common.exception_handlers import (
     domainErrorHandler,
@@ -19,9 +21,17 @@ from app.settings import settings
 
 configureLogging(env=settings.env)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    await initDevSchemaIfEnabled()
+    yield
+
+
 app = FastAPI(
     title="Ticketing API",
     version="0.1.0",
+    lifespan=lifespan,
     description=(
         "AWS 인프라 (EKS · RDS · ElastiCache · SQS · CloudWatch) 의 스파이크 흡수 능력을 "
         "검증하기 위한 티켓팅 서비스.\n\n"
