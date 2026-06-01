@@ -21,7 +21,16 @@ from app.domains.user.service import UserService
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/signup", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/signup",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="회원가입",
+    responses={
+        409: {"description": "이미 사용 중인 사용자 이름"},
+        422: {"description": "요청 검증 실패 (user_name 3~255자, password 8~72자)"},
+    },
+)
 async def signup(
     payload: SignupRequest,
     session: Annotated[AsyncSession, Depends(getCoreWriterSession)],
@@ -30,7 +39,12 @@ async def signup(
     return UserRead.model_validate(user)
 
 
-@router.post("/login", response_model=TokenPair)
+@router.post(
+    "/login",
+    response_model=TokenPair,
+    summary="로그인 (access + refresh 토큰 발급)",
+    responses={401: {"description": "아이디 또는 비밀번호 불일치"}},
+)
 async def login(
     payload: LoginRequest,
     session: Annotated[AsyncSession, Depends(getCoreReaderSession)],
@@ -44,7 +58,12 @@ async def login(
     )
 
 
-@router.post("/refresh", response_model=TokenPair)
+@router.post(
+    "/refresh",
+    response_model=TokenPair,
+    summary="refresh token 으로 새 토큰쌍 발급",
+    responses={401: {"description": "만료·위조·access 토큰 오용"}},
+)
 async def refresh(payload: RefreshRequest) -> TokenPair:
     token = decodeToken(payload.refresh_token, expected_type="refresh")
     return TokenPair(

@@ -14,12 +14,16 @@ from app.common.deps import (
 router = APIRouter(tags=["health"])
 
 
-@router.get("/healthz")
+@router.get("/healthz", summary="Liveness probe (프로세스 생존 확인)")
 async def liveness() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/readyz")
+@router.get(
+    "/readyz",
+    summary="Readiness probe (DB · Redis 의존성 검증)",
+    responses={503: {"description": "의존성 미준비"}},
+)
 async def readiness(
     core: Annotated[AsyncSession, Depends(getCoreReaderSession)],
     reservation: Annotated[AsyncSession, Depends(getReservationReaderSession)],

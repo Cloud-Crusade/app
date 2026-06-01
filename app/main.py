@@ -15,7 +15,23 @@ from app.settings import settings
 configureLogging(env=settings.env)
 logger = structlog.get_logger()
 
-app = FastAPI(title="Ticketing API")
+app = FastAPI(
+    title="Ticketing API",
+    version="0.1.0",
+    description=(
+        "AWS 인프라 (EKS · RDS · ElastiCache · SQS · CloudWatch) 의 스파이크 흡수 능력을 "
+        "검증하기 위한 티켓팅 서비스.\n\n"
+        "기능 범위는 **인증 · 행사 관리 · 티켓팅** 으로 한정합니다.\n\n"
+        "- Swagger UI: `/docs`\n"
+        "- ReDoc: `/redoc`\n"
+        "- OpenAPI JSON: `/openapi.json`"
+    ),
+    openapi_tags=[
+        {"name": "auth", "description": "회원가입 · 로그인 · 토큰 갱신"},
+        {"name": "users", "description": "사용자 프로필"},
+        {"name": "health", "description": "헬스체크 (k8s probe · ALB target)"},
+    ],
+)
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):

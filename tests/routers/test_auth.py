@@ -98,10 +98,11 @@ async def test_get_me_returns_user(client):
 
 
 @pytest.mark.asyncio
-async def test_get_me_without_token_returns_422(client):
-    # authorization 헤더 미존재 → FastAPI 의 Header(...) 검증 단계에서 422
+async def test_get_me_without_token_returns_401(client):
+    # HTTPBearer: Authorization 헤더 미존재 시 401 + WWW-Authenticate: Bearer (RFC 7235)
     response = await client.get("/users/me")
-    assert response.status_code == 422
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
 
 
 @pytest.mark.asyncio
