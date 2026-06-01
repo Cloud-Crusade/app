@@ -9,6 +9,7 @@ SAMPLE_EVENT = {
         "end_at": "2026-12-01T21:00:00+00:00",
     },
     "img_urls": ["https://cdn.example.com/a.jpg"],
+    "total_seats": 100,
 }
 
 

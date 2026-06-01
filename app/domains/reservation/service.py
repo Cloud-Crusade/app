@@ -5,8 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.errors import (
     EventNotFoundError,
+    EventSoldOutError,
     ReservationNotFoundError,
     SeatAlreadyTakenError,
+    SeatOutOfRangeError,
 )
 from app.common.sqs import SqsPublisher
 from app.domains.event.repository import EventRepository
@@ -24,6 +26,10 @@ MAX_PAGE_SIZE = 100
 
 def _holdKey(event_id: UUID, reserved_num: int) -> str:
     return f"seat:hold:{event_id}:{reserved_num}"
+
+
+def _remainKey(event_id: UUID) -> str:
+    return f"seats:remain:{event_id}"
 
 
 class ReservationReadService:
@@ -70,18 +76,36 @@ class ReservationWriteService:
         if event is None:
             raise EventNotFoundError(event_id=str(payload.event_id))
 
-        # 2. Redis 좌석 hold (SETNX + TTL)
-        key = _holdKey(payload.event_id, payload.reserved_num)
+        # 2. 좌석 번호 범위 검증 — 존재하지 않는 좌석을 SQS 에 넣지 않도록 사전 차단
+        if not 1 <= payload.reserved_num <= event.total_seats:
+            raise SeatOutOfRangeError(
+                event_id=str(payload.event_id),
+                reserved_num=payload.reserved_num,
+                total_seats=event.total_seats,
+            )
+
+        # 3. Redis 잔여 카운터 (lazy init + 원자적 DECR) — 매진 차단
+        remain_key = _remainKey(payload.event_id)
+        await self._redis.set(remain_key, event.total_seats, nx=True)
+        remain = await self._redis.decr(remain_key)
+        if remain < 0:
+            await self._redis.incr(remain_key)  # 복구
+            raise EventSoldOutError(event_id=str(payload.event_id))
+
+        # 4. Redis 좌석 hold (SETNX + TTL) — 동일 좌석 동시 점유 차단
+        hold_key = _holdKey(payload.event_id, payload.reserved_num)
         acquired = await self._redis.set(
-            key, str(user_id), nx=True, ex=settings.seat_hold_ttl_seconds,
+            hold_key, str(user_id), nx=True, ex=settings.seat_hold_ttl_seconds,
         )
         if not acquired:
+            # 좌석 hold 실패 → 잔여 카운터 복구 (실제 점유는 다른 사용자)
+            await self._redis.incr(remain_key)
             raise SeatAlreadyTakenError(
                 event_id=str(payload.event_id),
                 reserved_num=payload.reserved_num,
             )
 
-        # 3. reservation_id 미리 발급 + SQS publish
+        # 5. reservation_id 미리 발급 + SQS publish
         reservation_id = uuid4()
         try:
             message = ReservationCreateMessage(
@@ -98,8 +122,9 @@ class ReservationWriteService:
                 dedup_id=str(reservation_id),
             )
         except Exception:
-            # SQS publish 실패 시 hold 즉시 해제 (보상)
-            await self._redis.delete(key)
+            # SQS publish 실패 시 hold + 카운터 양방향 보상
+            await self._redis.delete(hold_key)
+            await self._redis.incr(remain_key)
             raise
 
         return reservation_id

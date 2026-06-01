@@ -73,3 +73,24 @@ class SeatAlreadyTakenError(DomainError):
             event_id=event_id,
             reserved_num=reserved_num,
         )
+
+
+class SeatOutOfRangeError(DomainError):
+    status_code = 400
+    code = "SEAT_OUT_OF_RANGE"
+
+    def __init__(self, *, event_id: str, reserved_num: int, total_seats: int) -> None:
+        super().__init__(
+            "존재하지 않는 좌석 번호입니다",
+            event_id=event_id,
+            reserved_num=reserved_num,
+            total_seats=total_seats,
+        )
+
+
+class EventSoldOutError(DomainError):
+    status_code = 409
+    code = "EVENT_SOLD_OUT"
+
+    def __init__(self, *, event_id: str) -> None:
+        super().__init__("해당 행사의 좌석이 모두 매진되었습니다", event_id=event_id)

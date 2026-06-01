@@ -20,6 +20,7 @@ class EventBase(BaseModel):
     body: str | None = None
     schedule: Schedule
     img_urls: list[str] = Field(default_factory=list)
+    total_seats: int = Field(ge=1)
 
 
 class EventCreate(EventBase):
@@ -31,6 +32,7 @@ class EventUpdate(BaseModel):
     body: str | None = None
     schedule: Schedule | None = None
     img_urls: list[str] | None = None
+    total_seats: int | None = Field(default=None, ge=1)
 
 
 class EventRead(EventBase):

@@ -8,13 +8,14 @@ from app.domains.event.schema import EventCreate, EventUpdate, Schedule
 from app.domains.event.service import EventService
 
 
-def _payload(*, title: str = "공연 A") -> EventCreate:
+def _payload(*, title: str = "공연 A", total_seats: int = 100) -> EventCreate:
     start = datetime(2026, 12, 1, 19, 0, tzinfo=UTC)
     return EventCreate(
         title=title,
         body="설명",
         schedule=Schedule(start_at=start, end_at=start + timedelta(hours=2)),
         img_urls=["https://cdn.example.com/a.jpg"],
+        total_seats=total_seats,
     )
 
 
@@ -30,6 +31,7 @@ async def test_create_event_persists_owner_and_payload(coreSession):
     assert event.title == "공연 A"
     assert event.schedule["start_at"].startswith("2026-12-01")
     assert event.img_urls == ["https://cdn.example.com/a.jpg"]
+    assert event.total_seats == 100
 
 
 @pytest.mark.asyncio
