@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     aws_endpoint_url: str | None = Field(default=None, alias="AWS_ENDPOINT_URL")
     sqs_reservation_queue_url: str = Field(..., alias="SQS_RESERVATION_QUEUE_URL")
 
-    seat_hold_ttl_seconds: int = Field(default=300, alias="SEAT_HOLD_TTL_SECONDS")
+    seat_hold_ttl_seconds: int = Field(default=2_592_000, alias="SEAT_HOLD_TTL_SECONDS")
 
 
 settings = Settings()
