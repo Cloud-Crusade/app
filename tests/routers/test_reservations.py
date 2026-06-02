@@ -140,6 +140,7 @@ async def test_delete_reservation_publishes_cancel(client, sqsMock, coreSession)
     assert message["action"] == "reservation.cancel"
     assert message["reservation_id"] == str(reservation.reservation_id)
     assert message["event_id"] == str(reservation.event_id)
+    assert message["reserved_num"] == reservation.reserved_num
 
 
 @pytest.mark.asyncio

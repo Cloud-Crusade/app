@@ -284,3 +284,4 @@ async def test_request_cancel_publishes_with_group_id(coreSession, redis):
     message = kwargs["message"]
     assert message["action"] == "reservation.cancel"
     assert message["event_id"] == str(reservation.event_id)   # Lambda 가 cross-DB 없이 알 수 있도록
+    assert message["reserved_num"] == reservation.reserved_num   # Lambda 가 seat:hold 키 구성 가능

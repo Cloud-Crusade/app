@@ -143,6 +143,7 @@ class ReservationWriteService:
             reservation_id=reservation_id,
             user_id=user_id,
             event_id=reservation.event_id,
+            reserved_num=reservation.reserved_num,
         )
         # group_id = event_id → 같은 이벤트의 create→cancel 이 한 group 으로 묶여 순서 보장
         await self._sqs.publish(
