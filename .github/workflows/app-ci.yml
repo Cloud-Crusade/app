@@ -19,11 +19,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install uv
+        run: pip install uv
+
       - name: Install packages
         run: |
-          python -m pip install --upgrade pip
-          pip install .
-          pip install pytest pytest-asyncio httpx aiosqlite fakeredis
+          uv pip install --system ".[dev]"
 
       - name: Run pytest
         run: pytest
