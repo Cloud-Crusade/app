@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Date, String, Text
+from sqlalchemy import JSON, Date, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -26,6 +26,7 @@ class Event(CoreBase):
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     schedule: Mapped[dict] = mapped_column(_JsonField, nullable=False)
     img_urls: Mapped[list] = mapped_column(_JsonField, nullable=False, default=list)
+    total_seats: Mapped[int] = mapped_column(Integer, nullable=False)
 
     created_at: Mapped[date] = mapped_column(
         Date,

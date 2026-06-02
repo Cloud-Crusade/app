@@ -33,6 +33,7 @@ class EventService:
             body=payload.body,
             schedule=payload.schedule.model_dump(mode="json"),
             img_urls=payload.img_urls,
+            total_seats=payload.total_seats,
         )
         async with self._session.begin():
             return await self._events.create(event)
@@ -50,6 +51,8 @@ class EventService:
                 event.schedule = payload.schedule.model_dump(mode="json")
             if payload.img_urls is not None:
                 event.img_urls = payload.img_urls
+            if payload.total_seats is not None:
+                event.total_seats = payload.total_seats
             return event
 
     async def delete(self, *, event_id: UUID) -> None:
