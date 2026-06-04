@@ -122,10 +122,11 @@ async def getReservation(
     reservation_id: UUID,
     user: Annotated[User, Depends(getCurrentUser)],
     session: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    redis: Annotated[Redis, Depends(getRedisClient)],
 ) -> ReservationRead:
     from app.common.errors import ReservationNotFoundError
 
-    reservation = await ReservationReadService(session).getById(reservation_id)
+    reservation = await ReservationReadService(session, redis).getById(reservation_id)
     if reservation.user_id != user.user_id:
         raise ReservationNotFoundError(reservation_id=str(reservation_id))
-    return ReservationRead.model_validate(reservation)
+    return reservation
