@@ -18,7 +18,7 @@ from app.domains.reservation.messages import (
 )
 from app.domains.reservation.model import Reservation
 from app.domains.reservation.repository import ReservationRepository
-from app.domains.reservation.schema import ReservationCreate
+from app.domains.reservation.schema import ReservationCreate, ReservationRead
 from app.settings import settings
 
 MAX_PAGE_SIZE = 100
@@ -32,17 +32,38 @@ def _remainKey(event_id: UUID) -> str:
     return f"seats:remain:{event_id}"
 
 
+def _reservationCacheKey(reservation_id: UUID) -> str:
+    return f"reservation:{reservation_id}"
+
+
 class ReservationReadService:
-    """동기 RDS 조회만 담당."""
+    """RDS 조회 — 단건은 캐시 우선(Redis) + DB 폴백(cache-aside), 목록은 DB 직결.
 
-    def __init__(self, reader_session: AsyncSession) -> None:
+    redis 가 주입되면 단건 조회가 캐시 우선으로 동작한다. 목록 조회는 redis 없이도 동작.
+    """
+
+    def __init__(self, reader_session: AsyncSession, redis: Redis | None = None) -> None:
         self._reservations = ReservationRepository(reader_session)
+        self._redis = redis
 
-    async def getById(self, reservation_id: UUID) -> Reservation:
+    async def getById(self, reservation_id: UUID) -> ReservationRead:
+        cache_key = _reservationCacheKey(reservation_id)
+        if self._redis is not None:
+            cached = await self._redis.get(cache_key)
+            if cached is not None:
+                return ReservationRead.model_validate_json(cached)
+
         reservation = await self._reservations.getById(reservation_id)
         if reservation is None:
             raise ReservationNotFoundError(reservation_id=str(reservation_id))
-        return reservation
+
+        read = ReservationRead.model_validate(reservation)
+        # 예매는 취소로 변경 가능 → cancel 시 무효화(requestCancel) + 짧은 TTL 로 staleness 제한
+        if self._redis is not None:
+            await self._redis.set(
+                cache_key, read.model_dump_json(), ex=settings.reservation_cache_ttl_seconds,
+            )
+        return read
 
     async def listPaged(
         self, *, page: int, size: int, user_id: UUID | None = None,
@@ -151,3 +172,5 @@ class ReservationWriteService:
             group_id=str(reservation.event_id),
             dedup_id=f"cancel:{reservation_id}",
         )
+        # 취소 요청 즉시 단건 캐시 무효화 (best-effort) — stale 한 미취소 상태 노출 최소화
+        await self._redis.delete(_reservationCacheKey(reservation_id))
