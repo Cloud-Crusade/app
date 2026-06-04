@@ -15,11 +15,11 @@ class PaymentRepository:
     async def getById(self, payment_history_id: UUID) -> PaymentHistory | None:
         return await self._session.get(PaymentHistory, payment_history_id)
 
-    async def listPaged(
+    async def listByOffset(
         self,
         *,
-        page: int,
-        size: int,
+        offset: int,
+        limit: int,
         user_id: UUID | None = None,
     ) -> tuple[list[PaymentHistory], int]:
         base = select(PaymentHistory)
@@ -33,8 +33,16 @@ class PaymentRepository:
                 PaymentHistory.created_at.desc(),
                 PaymentHistory.payment_history_id.desc(),
             )
-            .offset((page - 1) * size)
-            .limit(size)
+            .offset(offset)
+            .limit(limit)
         )
         items = list((await self._session.execute(items_stmt)).scalars().all())
         return items, total
+
+    async def existingIds(self, payment_history_ids: list[UUID]) -> set[UUID]:
+        if not payment_history_ids:
+            return set()
+        stmt = select(PaymentHistory.payment_history_id).where(
+            PaymentHistory.payment_history_id.in_(payment_history_ids),
+        )
+        return set((await self._session.execute(stmt)).scalars().all())

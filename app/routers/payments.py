@@ -66,12 +66,7 @@ async def listMyPayments(
     items, total = await PaymentReadService(session, redis).listPaged(
         page=page, size=size, user_id=user.user_id,
     )
-    return PaymentPage(
-        items=[PaymentRead.model_validate(p) for p in items],
-        total=total,
-        page=page,
-        size=size,
-    )
+    return PaymentPage(items=items, total=total, page=page, size=size)
 
 
 @router.get(

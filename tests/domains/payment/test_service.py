@@ -11,6 +11,7 @@ from app.domains.payment.service import (
     PaymentReadService,
     PaymentWriteService,
     _cacheKey,
+    _userIndexKey,
 )
 from app.domains.reservation.model import Reservation
 from app.domains.reservation.schema import ReservationRead
@@ -162,3 +163,112 @@ async def test_get_by_id_serves_from_cache_without_db(coreSession, redis):
     read = await service.getById(pid)
 
     assert read.payment_method == "card"  # DB 조회 없이 캐시에서 반환
+
+
+@pytest.mark.asyncio
+async def test_request_create_populates_cache_and_user_index(coreSession, redis):
+    # 생성 시 단건 캐시 + per-user 인덱스 적재 검증
+    user_id = uuid4()
+    reservation = await _seedReservation(coreSession, user_id=user_id)
+    sqs = AsyncMock()
+    sqs.publish = AsyncMock(return_value="m")
+    service = PaymentWriteService(
+        reservation_reader_session=coreSession, redis=redis, sqs=sqs,
+    )
+
+    payment_id = await service.requestCreate(
+        user_id=user_id,
+        payload=PaymentCreate(
+            reservation_id=reservation.reservation_id, payment_method="mock",
+        ),
+    )
+
+    cached = await redis.get(_cacheKey(payment_id))
+    assert cached is not None
+    assert PaymentRead.model_validate_json(cached).user_id == user_id
+    assert str(payment_id) in await redis.smembers(_userIndexKey(user_id))
+
+
+@pytest.mark.asyncio
+async def test_list_paged_includes_inflight_from_cache(coreSession, redis):
+    # 아직 DB 에 없는(SQS 대기) 결제가 목록에 포함되어야 함
+    user_id = uuid4()
+    reservation = await _seedReservation(coreSession, user_id=user_id)
+    sqs = AsyncMock()
+    sqs.publish = AsyncMock(return_value="m")
+    payment_id = await PaymentWriteService(
+        reservation_reader_session=coreSession, redis=redis, sqs=sqs,
+    ).requestCreate(
+        user_id=user_id,
+        payload=PaymentCreate(
+            reservation_id=reservation.reservation_id, payment_method="mock",
+        ),
+    )
+
+    items, total = await PaymentReadService(coreSession, redis).listPaged(
+        page=1, size=20, user_id=user_id,
+    )
+
+    assert total == 1
+    assert [p.payment_history_id for p in items] == [payment_id]
+
+
+@pytest.mark.asyncio
+async def test_list_paged_dedups_persisted_and_cleans_index(coreSession, redis):
+    # 캐시+인덱스 에 있고 DB 에도 영속된 경우 — 중복 없이 1건, 인덱스 정리(self-heal)
+    user_id = uuid4()
+    payment = PaymentHistory(
+        payment_history_id=uuid4(),
+        user_id=user_id,
+        reservation_id=uuid4(),
+        payment_method="mock",
+    )
+    coreSession.add(payment)
+    await coreSession.commit()
+
+    pid = payment.payment_history_id
+    cached = PaymentRead.model_validate(payment)
+    await redis.set(_cacheKey(pid), cached.model_dump_json())
+    await redis.sadd(_userIndexKey(user_id), str(pid))
+
+    items, total = await PaymentReadService(coreSession, redis).listPaged(
+        page=1, size=20, user_id=user_id,
+    )
+
+    assert total == 1
+    assert len(items) == 1
+    # 영속분은 인덱스에서 제거되어야 함
+    assert str(pid) not in await redis.smembers(_userIndexKey(user_id))
+
+
+@pytest.mark.asyncio
+async def test_list_paged_offset_merge_paginates_across_cache_and_db(coreSession, redis):
+    # pending(캐시) 1건 + DB 1건, size=1 → page1=pending, page2=db, total=2
+    user_id = uuid4()
+    db_payment = PaymentHistory(
+        payment_history_id=uuid4(),
+        user_id=user_id,
+        reservation_id=uuid4(),
+        payment_method="db",
+    )
+    coreSession.add(db_payment)
+    await coreSession.commit()
+
+    pending_id = uuid4()
+    pending = PaymentRead(
+        payment_history_id=pending_id,
+        user_id=user_id,
+        reservation_id=uuid4(),
+        payment_method="pending",
+        created_at=date(2026, 6, 4),
+    )
+    await redis.set(_cacheKey(pending_id), pending.model_dump_json())
+    await redis.sadd(_userIndexKey(user_id), str(pending_id))
+
+    service = PaymentReadService(coreSession, redis)
+    page1, total1 = await service.listPaged(page=1, size=1, user_id=user_id)
+    page2, total2 = await service.listPaged(page=2, size=1, user_id=user_id)
+
+    assert total1 == total2 == 2
+    assert [p.payment_history_id for p in page1] == [pending_id]   # 미영속이 최신
+    assert [p.payment_history_id for p in page2] == [db_payment.payment_history_id]
