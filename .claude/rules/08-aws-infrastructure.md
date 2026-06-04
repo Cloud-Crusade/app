@@ -225,18 +225,21 @@ spec:
 - **eviction policy**: `allkeys-lru`
 - **maxmemory**: 인스턴스 메모리의 75%
 
-### 사용 용도 — 좌석 hold + 잔여 카운터 + 결제 캐시
+### 사용 용도 — 좌석 hold + 잔여 카운터 + 결제·예매 단건 캐시
 
 | 용도 | Key prefix | TTL |
 |---|---|---|
 | 좌석 hold | `seat:hold:{event_id}:{seat_no}` | 5 분 |
 | 좌석 잔여 카운터 | `seats:remain:{event_id}` | 무기한 (이벤트 종료 시 수동 삭제) |
 | 결제 내역 캐시 | `payment:{payment_history_id}` | `PAYMENT_CACHE_TTL_SECONDS` (기본 3600s) |
+| 예매 단건 캐시 | `reservation:{reservation_id}` | `RESERVATION_CACHE_TTL_SECONDS` (기본 300s) |
 
 > 결제 캐시는 단건 조회 cache-aside 용도. 결제 기록은 불변(수정·취소 없음)이라 무효화 없이 TTL 만으로 충분하다. 목록 조회는 캐싱하지 않고 DB 직결.
+>
+> 예매 단건 캐시는 cache-aside. 예매는 취소로 변경 가능하므로 cancel 요청 시 캐시를 무효화하고, 잔여 staleness 는 짧은 TTL 로 제한한다. 목록 조회는 캐싱하지 않고 DB 직결.
 
 ### 규칙
-- **key prefix 는 위 표 세 가지만** — 신규 prefix 추가 시 본 문서 갱신 필수
+- **key prefix 는 위 표 네 가지만** — 신규 prefix 추가 시 본 문서 갱신 필수
 - **TTL 필수** — 위 카운터 외 무기한 key 금지
 - **mutate 전 `nx=True` 보장** — race 회피 (좌석 hold)
 - **장애 시 graceful fallback** — Redis 다운 시 좌석 hold 는 DB row lock 으로 fallback (성능 ↓, 동작 유지)
