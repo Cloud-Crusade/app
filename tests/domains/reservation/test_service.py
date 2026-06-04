@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -18,6 +18,7 @@ from app.domains.reservation.service import (
     ReservationWriteService,
     _holdKey,
     _remainKey,
+    _reservationCacheKey,
 )
 
 
@@ -285,3 +286,73 @@ async def test_request_cancel_publishes_with_group_id(coreSession, redis):
     assert message["action"] == "reservation.cancel"
     assert message["event_id"] == str(reservation.event_id)   # Lambda 가 cross-DB 없이 알 수 있도록
     assert message["reserved_num"] == reservation.reserved_num   # Lambda 가 seat:hold 키 구성 가능
+
+
+@pytest.mark.asyncio
+async def test_get_by_id_cache_miss_then_populates_cache(coreSession, redis):
+    from app.domains.reservation.model import Reservation
+
+    reservation = Reservation(
+        reservation_id=uuid4(), user_id=uuid4(), event_id=uuid4(), reserved_num=2,
+    )
+    coreSession.add(reservation)
+    await coreSession.commit()
+    service = ReservationReadService(coreSession, redis)
+
+    assert await redis.get(_reservationCacheKey(reservation.reservation_id)) is None
+    read = await service.getById(reservation.reservation_id)
+
+    assert read.reservation_id == reservation.reservation_id
+    # 캐시 miss → DB 조회 후 적재되어야 함
+    assert await redis.get(_reservationCacheKey(reservation.reservation_id)) is not None
+
+
+@pytest.mark.asyncio
+async def test_get_by_id_serves_from_cache_without_db(coreSession, redis):
+    from app.domains.reservation.schema import ReservationRead
+
+    # DB 에는 없지만 캐시에만 있는 경우 — 캐시 우선(cache hit) 동작 검증
+    rid = uuid4()
+    cached = ReservationRead(
+        reservation_id=rid,
+        user_id=uuid4(),
+        event_id=uuid4(),
+        is_canceled=False,
+        reserved_num=9,
+        created_at=date(2026, 6, 4),
+        last_modified=None,
+    )
+    await redis.set(_reservationCacheKey(rid), cached.model_dump_json())
+    service = ReservationReadService(coreSession, redis)
+
+    read = await service.getById(rid)
+
+    assert read.reserved_num == 9  # DB 조회 없이 캐시에서 반환
+
+
+@pytest.mark.asyncio
+async def test_request_cancel_invalidates_cache(coreSession, redis):
+    from app.domains.reservation.model import Reservation
+
+    user_id = uuid4()
+    reservation = Reservation(
+        reservation_id=uuid4(), user_id=user_id, event_id=uuid4(), reserved_num=1,
+    )
+    coreSession.add(reservation)
+    await coreSession.commit()
+
+    # 캐시 적재 후 취소 → 캐시 무효화 검증
+    await ReservationReadService(coreSession, redis).getById(reservation.reservation_id)
+    assert await redis.get(_reservationCacheKey(reservation.reservation_id)) is not None
+
+    sqs = AsyncMock()
+    sqs.publish = AsyncMock(return_value="m")
+    write = ReservationWriteService(
+        core_reader_session=coreSession,
+        reservation_reader_session=coreSession,
+        redis=redis,
+        sqs=sqs,
+    )
+    await write.requestCancel(user_id=user_id, reservation_id=reservation.reservation_id)
+
+    assert await redis.get(_reservationCacheKey(reservation.reservation_id)) is None

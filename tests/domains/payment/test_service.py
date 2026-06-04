@@ -25,12 +25,14 @@ async def _seedReservation(session, *, user_id):
 
 
 @pytest.mark.asyncio
-async def test_request_create_publishes_payment_message(coreSession):
+async def test_request_create_publishes_payment_message(coreSession, redis):
     user_id = uuid4()
     reservation = await _seedReservation(coreSession, user_id=user_id)
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="m")
-    service = PaymentWriteService(reservation_reader_session=coreSession, sqs=sqs)
+    service = PaymentWriteService(
+        reservation_reader_session=coreSession, redis=redis, sqs=sqs,
+    )
 
     payment_history_id = await service.requestCreate(
         user_id=user_id,
@@ -51,9 +53,11 @@ async def test_request_create_publishes_payment_message(coreSession):
 
 
 @pytest.mark.asyncio
-async def test_request_create_when_reservation_missing_raises(coreSession):
+async def test_request_create_when_reservation_missing_raises(coreSession, redis):
     sqs = AsyncMock()
-    service = PaymentWriteService(reservation_reader_session=coreSession, sqs=sqs)
+    service = PaymentWriteService(
+        reservation_reader_session=coreSession, redis=redis, sqs=sqs,
+    )
 
     with pytest.raises(ReservationNotFoundError):
         await service.requestCreate(
@@ -64,10 +68,12 @@ async def test_request_create_when_reservation_missing_raises(coreSession):
 
 
 @pytest.mark.asyncio
-async def test_request_create_when_reservation_not_owned_raises(coreSession):
+async def test_request_create_when_reservation_not_owned_raises(coreSession, redis):
     reservation = await _seedReservation(coreSession, user_id=uuid4())
     sqs = AsyncMock()
-    service = PaymentWriteService(reservation_reader_session=coreSession, sqs=sqs)
+    service = PaymentWriteService(
+        reservation_reader_session=coreSession, redis=redis, sqs=sqs,
+    )
 
     with pytest.raises(ReservationNotFoundError):
         await service.requestCreate(
