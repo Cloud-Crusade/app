@@ -1,0 +1,39 @@
+name: ecr push
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+jobs:
+  push:
+    if: github.event_name == 'push' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: login ecr
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: build image
+        run: docker build -t ticketing-app .
+
+      - name: tag image
+        run: docker tag ticketing-app:latest ${{ steps.login-ecr.outputs.registry }}/ticketing-app:latest
+
+      - name: push image
+        run: docker push ${{ steps.login-ecr.outputs.registry }}/ticketing-app:latest
