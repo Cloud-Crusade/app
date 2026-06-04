@@ -1,8 +1,9 @@
 name: ecr push
 
 on:
-  workflow_dispatch:
-  # 테스트 완료 후 main branch 자동 배포 추가 예정
+  push:
+    branches:
+      - main
 
 jobs:
   push:
