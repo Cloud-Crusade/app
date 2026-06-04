@@ -94,3 +94,12 @@ class EventSoldOutError(DomainError):
 
     def __init__(self, *, event_id: str) -> None:
         super().__init__("해당 행사의 좌석이 모두 매진되었습니다", event_id=event_id)
+
+
+# === Payment ===
+class PaymentNotFoundError(DomainError):
+    status_code = 404
+    code = "PAYMENT_NOT_FOUND"
+
+    def __init__(self, *, payment_history_id: str) -> None:
+        super().__init__("결제 내역을 찾을 수 없습니다", payment_history_id=payment_history_id)
