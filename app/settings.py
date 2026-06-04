@@ -25,5 +25,7 @@ class Settings(BaseSettings):
 
     seat_hold_ttl_seconds: int = Field(default=2_592_000, alias="SEAT_HOLD_TTL_SECONDS")
 
+    payment_cache_ttl_seconds: int = Field(default=3600, alias="PAYMENT_CACHE_TTL_SECONDS")
+
 
 settings = Settings()
