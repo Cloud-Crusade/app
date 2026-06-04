@@ -236,7 +236,7 @@ spec:
 
 > 결제 캐시는 단건 조회 cache-aside 용도. 결제 기록은 불변(수정·취소 없음)이라 무효화 없이 TTL 만으로 충분하다. 목록 조회는 캐싱하지 않고 DB 직결.
 >
-> 예매 단건 캐시는 cache-aside. 예매는 취소로 변경 가능하므로 cancel 요청 시 캐시를 무효화하고, 잔여 staleness 는 짧은 TTL 로 제한한다. 목록 조회는 캐싱하지 않고 DB 직결.
+> 예매 단건 캐시(value=전체 ReservationRead). 생성 시 낙관적 적재 — write 가 SQS→Lambda 비동기라 DB 반영 전에도 결제 검증(getById)이 hit 하도록 한다. 조회 miss 시에도 적재(cache-aside). 예매는 취소로 변경 가능하므로 cancel 요청 시 무효화하고, 잔여 staleness 는 짧은 TTL 로 제한한다. 목록 조회는 캐싱하지 않고 DB 직결.
 
 ### 규칙
 - **key prefix 는 위 표 네 가지만** — 신규 prefix 추가 시 본 문서 갱신 필수

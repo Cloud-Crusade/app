@@ -12,7 +12,7 @@ from app.common.errors import (
     SeatOutOfRangeError,
 )
 from app.domains.event.model import Event
-from app.domains.reservation.schema import ReservationCreate
+from app.domains.reservation.schema import ReservationCreate, ReservationRead
 from app.domains.reservation.service import (
     ReservationReadService,
     ReservationWriteService,
@@ -356,3 +356,30 @@ async def test_request_cancel_invalidates_cache(coreSession, redis):
     await write.requestCancel(user_id=user_id, reservation_id=reservation.reservation_id)
 
     assert await redis.get(_reservationCacheKey(reservation.reservation_id)) is None
+
+
+@pytest.mark.asyncio
+async def test_request_create_populates_reservation_cache(coreSession, redis):
+    # 생성 시 낙관적 캐시 적재 — Lambda DB write 전에도 결제 검증이 hit 하도록
+    event = await _seedEvent(coreSession)
+    sqs = AsyncMock()
+    sqs.publish = AsyncMock(return_value="m")
+    user_id = uuid4()
+    service = ReservationWriteService(
+        core_reader_session=coreSession,
+        reservation_reader_session=coreSession,
+        redis=redis,
+        sqs=sqs,
+    )
+
+    reservation_id = await service.requestCreate(
+        user_id=user_id,
+        payload=ReservationCreate(event_id=event.event_id, reserved_num=3),
+    )
+
+    cached = await redis.get(_reservationCacheKey(reservation_id))
+    assert cached is not None
+    read = ReservationRead.model_validate_json(cached)
+    assert read.user_id == user_id          # 소유자 검증용 필드 포함
+    assert read.is_canceled is False
+    assert read.reserved_num == 3
