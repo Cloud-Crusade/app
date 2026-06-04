@@ -9,7 +9,7 @@ from app.domains.payment.messages import PaymentCreateMessage
 from app.domains.payment.model import PaymentHistory
 from app.domains.payment.repository import PaymentRepository
 from app.domains.payment.schema import PaymentCreate, PaymentRead
-from app.domains.reservation.repository import ReservationRepository
+from app.domains.reservation.service import ReservationReadService
 from app.settings import settings
 
 MAX_PAGE_SIZE = 100
@@ -58,15 +58,18 @@ class PaymentWriteService:
         self,
         *,
         reservation_reader_session: AsyncSession,
+        redis: Redis,
         sqs: SqsPublisher,
     ) -> None:
-        self._reservations = ReservationRepository(reservation_reader_session)
+        # reservation service 의 캐시 우선 조회를 재사용 (cache hit 우선 → DB 폴백)
+        self._reservations = ReservationReadService(reservation_reader_session, redis)
         self._sqs = sqs
 
     async def requestCreate(self, *, user_id: UUID, payload: PaymentCreate) -> UUID:
-        # 결제 대상 예매 존재 + 본인 소유 검증 — 없는 예매를 SQS 에 넣지 않도록 사전 차단
+        # 결제 대상 예매 존재 검증 — 없으면 ReservationNotFoundError (캐시 우선 조회)
         reservation = await self._reservations.getById(payload.reservation_id)
-        if reservation is None or reservation.user_id != user_id:
+        # 본인 소유 검증 — 없는 예매를 SQS 에 넣지 않도록 사전 차단
+        if reservation.user_id != user_id:
             raise ReservationNotFoundError(reservation_id=str(payload.reservation_id))
 
         payment_history_id = uuid4()

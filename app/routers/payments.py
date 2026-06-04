@@ -40,9 +40,12 @@ async def createPayment(
     payload: PaymentCreate,
     user: Annotated[User, Depends(getCurrentUser)],
     reservation_reader: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    redis: Annotated[Redis, Depends(getRedisClient)],
     sqs: Annotated[SqsPublisher, Depends(getReservationSqs)],
 ) -> PaymentAccepted:
-    service = PaymentWriteService(reservation_reader_session=reservation_reader, sqs=sqs)
+    service = PaymentWriteService(
+        reservation_reader_session=reservation_reader, redis=redis, sqs=sqs,
+    )
     payment_history_id = await service.requestCreate(user_id=user.user_id, payload=payload)
     return PaymentAccepted(payment_history_id=payment_history_id)
 
