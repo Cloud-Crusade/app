@@ -245,13 +245,22 @@ class ReservationWriteService:
 
         return reservation_id
 
-    async def requestCancel(self, *, user_id: UUID, reservation_id: UUID) -> None:
-        # reservation 존재 확인 (read RDS)
+    async def _loadForCancel(self, reservation_id: UUID) -> ReservationRead:
+        # cache-first — 미영속(SQS 대기) 예매는 DB 에 없고 캐시에만 존재하므로 캐시 우선 조회.
+        # 캐시 value 는 전체 ReservationRead 라 user_id·is_canceled 까지 그대로 검증에 쓰인다.
+        cached = await self._redis.get(_reservationCacheKey(reservation_id))
+        if cached is not None:
+            return ReservationRead.model_validate_json(cached)
+
         reservation = await self._reservations.getById(reservation_id)
         if reservation is None:
             raise ReservationNotFoundError(reservation_id=str(reservation_id))
+        return ReservationRead.model_validate(reservation)
 
-        # 본인 예약만 취소 가능 (단순 owner check)
+    async def requestCancel(self, *, user_id: UUID, reservation_id: UUID) -> None:
+        reservation = await self._loadForCancel(reservation_id)
+
+        # 본인 예약만 취소 가능 (단순 owner check — 미존재와 동일하게 404 로 가린다)
         if reservation.user_id != user_id:
             raise ReservationNotFoundError(reservation_id=str(reservation_id))
 

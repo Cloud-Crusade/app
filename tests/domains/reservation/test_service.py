@@ -289,6 +289,42 @@ async def test_request_cancel_publishes_with_group_id(coreSession, redis):
 
 
 @pytest.mark.asyncio
+async def test_request_cancel_pending_reservation_from_cache(coreSession, redis):
+    # 미영속(DB 미반영) 예매 — 캐시에만 존재해도 취소 가능해야 함 (cache-first)
+    user_id = uuid4()
+    event_id = uuid4()
+    rid = uuid4()
+    cached = ReservationRead(
+        reservation_id=rid,
+        user_id=user_id,
+        event_id=event_id,
+        is_canceled=False,
+        reserved_num=5,
+        created_at=date(2026, 6, 5),
+        last_modified=None,
+    )
+    await redis.set(_reservationCacheKey(rid), cached.model_dump_json())
+
+    sqs = AsyncMock()
+    sqs.publish = AsyncMock(return_value="msg-c")
+    service = ReservationWriteService(
+        core_reader_session=coreSession,
+        reservation_reader_session=coreSession,  # DB 에는 없음
+        redis=redis,
+        sqs=sqs,
+    )
+
+    await service.requestCancel(user_id=user_id, reservation_id=rid)
+
+    sqs.publish.assert_awaited_once()
+    message = sqs.publish.await_args.kwargs["message"]
+    assert message["event_id"] == str(event_id)
+    assert message["reserved_num"] == 5
+    # 취소 즉시 단건 캐시 무효화
+    assert await redis.get(_reservationCacheKey(rid)) is None
+
+
+@pytest.mark.asyncio
 async def test_get_by_id_cache_miss_then_populates_cache(coreSession, redis):
     from app.domains.reservation.model import Reservation
 
