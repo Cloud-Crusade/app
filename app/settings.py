@@ -7,6 +7,12 @@ class Settings(BaseSettings):
 
     env: str = "development"
 
+    # 프론트엔드(cc/web) 교차 출처 요청 허용 origin — preflight(OPTIONS) 처리
+    cors_allow_origins: list[str] = Field(
+        default=["http://localhost:5173", "http://127.0.0.1:5173"],
+        alias="CORS_ALLOW_ORIGINS",
+    )
+
     core_writer_url: str = Field(..., alias="CORE_WRITER_URL")
     core_reader_url: str = Field(..., alias="CORE_READER_URL")
     reservation_writer_url: str = Field(..., alias="RESERVATION_WRITER_URL")

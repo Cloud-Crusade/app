@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -70,6 +71,15 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(RequestIdMiddleware)
+# CORS 는 가장 바깥에서 preflight(OPTIONS)를 먼저 처리하도록 마지막에 등록
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
+)
 app.add_exception_handler(DomainError, domainErrorHandler)
 app.add_exception_handler(RequestValidationError, validationErrorHandler)
 app.add_exception_handler(IntegrityError, integrityErrorHandler)
