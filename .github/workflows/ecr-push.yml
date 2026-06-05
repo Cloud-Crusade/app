@@ -1,9 +1,8 @@
 name: ecr push
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+
   pull_request:
     branches:
       - main
@@ -11,7 +10,7 @@ on:
 
 jobs:
   push:
-    if: github.event_name == 'push' || github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
