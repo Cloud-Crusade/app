@@ -234,10 +234,11 @@ spec:
 | 결제 내역 캐시 | `payment:{payment_history_id}` | `PAYMENT_CACHE_TTL_SECONDS` (기본 3600s) |
 | 결제 미영속 인덱스 | `payment:user:{user_id}` (set) | `PAYMENT_CACHE_TTL_SECONDS` (생성 시 갱신) |
 | 예매 단건 캐시 | `reservation:{reservation_id}` | `RESERVATION_CACHE_TTL_SECONDS` (기본 300s) |
+| 예매 미영속 인덱스 | `reservation:user:{user_id}` (set) | `RESERVATION_CACHE_TTL_SECONDS` (생성 시 갱신) |
 
 > 결제 캐시는 단건 cache-aside + **생성 시 낙관적 적재**(write 가 SQS→Lambda 비동기라 DB 반영 전에도 단건/다건 조회에 보이도록). 결제 기록은 불변이라 무효화 없이 TTL 만으로 충분. 목록 조회는 per-user 인덱스(`payment:user:{user_id}`)로 미영속분을 DB 결과와 병합하며, DB 영속·만료분은 조회 시 인덱스에서 정리(self-heal)한다.
 >
-> 예매 단건 캐시(value=전체 ReservationRead). 생성 시 낙관적 적재 — write 가 SQS→Lambda 비동기라 DB 반영 전에도 결제 검증(getById)이 hit 하도록 한다. 조회 miss 시에도 적재(cache-aside). 예매는 취소로 변경 가능하므로 cancel 요청 시 무효화하고, 잔여 staleness 는 짧은 TTL 로 제한한다. 목록 조회는 캐싱하지 않고 DB 직결.
+> 예매 단건 캐시(value=전체 ReservationRead). 생성 시 낙관적 적재 — write 가 SQS→Lambda 비동기라 DB 반영 전에도 단건/다건 조회가 hit 하도록 한다. 조회 miss 시에도 적재(cache-aside). 목록 조회는 결제와 동일하게 per-user 인덱스(`reservation:user:{user_id}`)로 미영속분을 DB 결과와 병합하며, DB 영속·만료분은 조회 시 인덱스에서 정리(self-heal)한다. 예매는 취소로 변경 가능하므로 cancel 요청 시 단건 캐시 무효화 + 인덱스에서 제거하고, 잔여 staleness 는 짧은 TTL 로 제한한다.
 
 ### 규칙
 - **key prefix 는 위 표 다섯 가지만** — 신규 prefix 추가 시 본 문서 갱신 필수

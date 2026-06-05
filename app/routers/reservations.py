@@ -95,18 +95,16 @@ async def cancelReservation(
 async def listMyReservations(
     user: Annotated[User, Depends(getCurrentUser)],
     session: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    redis: Annotated[Redis, Depends(getRedisClient)],
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> ReservationPage:
-    items, total = await ReservationReadService(session).listPaged(
-        page=page, size=size, user_id=user.user_id,
-    )
-    return ReservationPage(
-        items=[ReservationRead.model_validate(r) for r in items],
-        total=total,
+    items, total = await ReservationReadService(session, redis).listPaged(
         page=page,
         size=size,
+        user_id=user.user_id,
     )
+    return ReservationPage(items=items, total=total, page=page, size=size)
 
 
 @router.get(
