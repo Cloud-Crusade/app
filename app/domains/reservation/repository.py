@@ -60,6 +60,14 @@ class ReservationRepository:
         items = list((await self._session.execute(items_stmt)).scalars().all())
         return items, total
 
+    async def occupiedSeatNumbers(self, event_id: UUID) -> set[int]:
+        # 취소되지 않은 예매의 좌석 번호만 — DB 에 영속된 점유 좌석
+        stmt = select(Reservation.reserved_num).where(
+            Reservation.event_id == event_id,
+            Reservation.is_canceled.is_(False),
+        )
+        return set((await self._session.execute(stmt)).scalars().all())
+
     async def existingIds(self, reservation_ids: list[UUID]) -> set[UUID]:
         if not reservation_ids:
             return set()

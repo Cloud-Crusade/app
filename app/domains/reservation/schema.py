@@ -28,6 +28,13 @@ class ReservationRead(BaseModel):
     last_modified: date | None
 
 
+class OccupiedSeats(BaseModel):
+    """이벤트의 점유 좌석 번호 목록 — 클라이언트 좌석 선택용."""
+
+    event_id: UUID
+    occupied: list[int]
+
+
 class ReservationPage(BaseModel):
     items: list[ReservationRead]
     total: int

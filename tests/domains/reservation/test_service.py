@@ -357,6 +357,37 @@ async def test_request_cancel_already_canceled_raises_and_skips_publish(coreSess
 
 
 @pytest.mark.asyncio
+async def test_occupied_seats_merges_db_and_redis_holds(coreSession, redis):
+    from app.domains.reservation.model import Reservation
+    from app.domains.reservation.service import _holdKey
+
+    event_id = uuid4()
+    # DB: 좌석 1(비취소), 좌석 2(취소 — 제외돼야 함)
+    coreSession.add(
+        Reservation(reservation_id=uuid4(), user_id=uuid4(), event_id=event_id, reserved_num=1),
+    )
+    coreSession.add(
+        Reservation(
+            reservation_id=uuid4(), user_id=uuid4(), event_id=event_id,
+            reserved_num=2, is_canceled=True,
+        ),
+    )
+    # 다른 이벤트 좌석 — 섞이면 안 됨
+    coreSession.add(
+        Reservation(reservation_id=uuid4(), user_id=uuid4(), event_id=uuid4(), reserved_num=9),
+    )
+    await coreSession.commit()
+
+    # Redis: 미영속 hold — 좌석 5
+    await redis.set(_holdKey(event_id, 5), str(uuid4()))
+
+    service = ReservationReadService(coreSession, redis)
+    occupied = await service.occupiedSeats(event_id)
+
+    assert occupied == [1, 5]  # 취소(2)·타 이벤트(9) 제외, 정렬
+
+
+@pytest.mark.asyncio
 async def test_get_by_id_cache_miss_then_populates_cache(coreSession, redis):
     from app.domains.reservation.model import Reservation
 
