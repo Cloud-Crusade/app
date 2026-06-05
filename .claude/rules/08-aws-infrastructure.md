@@ -241,7 +241,7 @@ spec:
 > 예매 단건 캐시(value=전체 ReservationRead). 생성 시 낙관적 적재 — write 가 SQS→Lambda 비동기라 DB 반영 전에도 단건/다건 조회가 hit 하도록 한다. 조회 miss 시에도 적재(cache-aside). 목록 조회는 결제와 동일하게 per-user 인덱스(`reservation:user:{user_id}`)로 미영속분을 DB 결과와 병합하며, DB 영속·만료분은 조회 시 인덱스에서 정리(self-heal)한다. 예매는 취소로 변경 가능하므로 cancel 요청 시 단건 캐시 무효화 + 인덱스에서 제거하고, 잔여 staleness 는 짧은 TTL 로 제한한다.
 
 ### 규칙
-- **key prefix 는 위 표 다섯 가지만** — 신규 prefix 추가 시 본 문서 갱신 필수
+- **key prefix 는 위 표에 정의된 것만** — 신규 prefix 추가 시 본 문서 갱신 필수
 - **TTL 필수** — 위 카운터 외 무기한 key 금지
 - **mutate 전 `nx=True` 보장** — race 회피 (좌석 hold)
 - **장애 시 graceful fallback** — Redis 다운 시 좌석 hold 는 DB row lock 으로 fallback (성능 ↓, 동작 유지)
