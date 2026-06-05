@@ -17,7 +17,6 @@ from app.domains.reservation.messages import (
     ReservationCancelMessage,
     ReservationCreateMessage,
 )
-from app.domains.reservation.model import Reservation
 from app.domains.reservation.repository import ReservationRepository
 from app.domains.reservation.schema import ReservationCreate, ReservationRead
 from app.settings import settings
@@ -33,14 +32,19 @@ def _remainKey(event_id: UUID) -> str:
     return f"seats:remain:{event_id}"
 
 
-def _reservationCacheKey(reservation_id: UUID) -> str:
+def _reservationCacheKey(reservation_id: UUID | str) -> str:
     return f"reservation:{reservation_id}"
 
 
-class ReservationReadService:
-    """RDS 조회 — 단건은 캐시 우선(Redis) + DB 폴백(cache-aside), 목록은 DB 직결.
+def _userIndexKey(user_id: UUID) -> str:
+    return f"reservation:user:{user_id}"
 
-    redis 가 주입되면 단건 조회가 캐시 우선으로 동작한다. 목록 조회는 redis 없이도 동작.
+
+class ReservationReadService:
+    """RDS 조회 — 단건은 캐시 우선(Redis) + DB 폴백(cache-aside).
+
+    redis 가 주입되면 단건 조회가 캐시 우선으로, 목록 조회가 미영속(SQS 대기) 예매를
+    per-user 인덱스에서 병합한다. redis 가 없으면 목록은 DB 직결로 폴백한다.
     캐시 value 는 전체 ReservationRead 라 user_id 도 포함 → 결제 소유자 검증에 그대로 쓰인다.
     """
 
@@ -63,16 +67,78 @@ class ReservationReadService:
         # 예매는 취소로 변경 가능 → cancel 시 무효화(requestCancel) + 짧은 TTL 로 staleness 제한
         if self._redis is not None:
             await self._redis.set(
-                cache_key, read.model_dump_json(), ex=settings.reservation_cache_ttl_seconds,
+                cache_key,
+                read.model_dump_json(),
+                ex=settings.reservation_cache_ttl_seconds,
             )
         return read
 
     async def listPaged(
-        self, *, page: int, size: int, user_id: UUID | None = None,
-    ) -> tuple[list[Reservation], int]:
+        self,
+        *,
+        page: int,
+        size: int,
+        user_id: UUID | None = None,
+    ) -> tuple[list[ReservationRead], int]:
         page = max(page, 1)
         size = max(1, min(size, MAX_PAGE_SIZE))
-        return await self._reservations.listPaged(page=page, size=size, user_id=user_id)
+        offset = (page - 1) * size
+
+        # 미영속(SQS 대기) 예매는 캐시에만 존재 → DB 와 병합. 가상 리스트 [pending ++ db].
+        pending = (
+            await self._pendingReservations(user_id)
+            if (self._redis is not None and user_id is not None)
+            else []
+        )
+        pending_count = len(pending)
+
+        db_offset = max(0, offset - pending_count)
+        db_items, db_total = await self._reservations.listByOffset(
+            offset=db_offset,
+            limit=size,
+            user_id=user_id,
+        )
+        db_reads = [ReservationRead.model_validate(r) for r in db_items]
+
+        window: list[ReservationRead] = []
+        if offset < pending_count:
+            window.extend(pending[offset : offset + size])
+        window.extend(db_reads[: size - len(window)])
+        return window, db_total + pending_count
+
+    async def _pendingReservations(self, user_id: UUID) -> list[ReservationRead]:
+        # per-user 인덱스에서 미영속 예매만 추림. DB 영속분·만료분은 인덱스에서 정리(self-heal).
+        assert self._redis is not None
+        index_key = _userIndexKey(user_id)
+        ids = await self._redis.smembers(index_key)
+        if not ids:
+            return []
+
+        pending: list[ReservationRead] = []
+        stale: list[str] = []
+        for member in ids:
+            rid = member.decode() if isinstance(member, bytes) else member
+            cached = await self._redis.get(_reservationCacheKey(rid))
+            if cached is None:
+                stale.append(rid)
+            else:
+                pending.append(ReservationRead.model_validate_json(cached))
+
+        if pending:
+            persisted = await self._reservations.existingIds(
+                [r.reservation_id for r in pending],
+            )
+            persisted_str = {str(rid) for rid in persisted}
+            stale.extend(
+                str(r.reservation_id) for r in pending if str(r.reservation_id) in persisted_str
+            )
+            pending = [r for r in pending if str(r.reservation_id) not in persisted_str]
+
+        if stale:
+            await self._redis.srem(index_key, *stale)
+
+        pending.sort(key=lambda r: (r.created_at, str(r.reservation_id)), reverse=True)
+        return pending
 
 
 class ReservationWriteService:
@@ -92,7 +158,10 @@ class ReservationWriteService:
         self._sqs = sqs
 
     async def requestCreate(
-        self, *, user_id: UUID, payload: ReservationCreate,
+        self,
+        *,
+        user_id: UUID,
+        payload: ReservationCreate,
     ) -> UUID:
         # 1. 이벤트 존재 검증 (core RDS read)
         event = await self._events.getById(payload.event_id)
@@ -118,7 +187,10 @@ class ReservationWriteService:
         # 4. Redis 좌석 hold (SETNX + TTL) — 동일 좌석 동시 점유 차단
         hold_key = _holdKey(payload.event_id, payload.reserved_num)
         acquired = await self._redis.set(
-            hold_key, str(user_id), nx=True, ex=settings.seat_hold_ttl_seconds,
+            hold_key,
+            str(user_id),
+            nx=True,
+            ex=settings.seat_hold_ttl_seconds,
         )
         if not acquired:
             # 좌석 hold 실패 → 잔여 카운터 복구 (실제 점유는 다른 사용자)
@@ -166,6 +238,10 @@ class ReservationWriteService:
             optimistic.model_dump_json(),
             ex=settings.reservation_cache_ttl_seconds,
         )
+        # 목록용 per-user 인덱스 — 미영속 예매를 listPaged 가 병합해 노출
+        index_key = _userIndexKey(user_id)
+        await self._redis.sadd(index_key, str(reservation_id))
+        await self._redis.expire(index_key, settings.reservation_cache_ttl_seconds)
 
         return reservation_id
 
@@ -191,5 +267,6 @@ class ReservationWriteService:
             group_id=str(reservation.event_id),
             dedup_id=f"cancel:{reservation_id}",
         )
-        # 취소 요청 즉시 단건 캐시 무효화 (best-effort) — stale 한 미취소 상태 노출 최소화
+        # 취소 요청 즉시 단건 캐시 무효화 + per-user 인덱스에서 제거 (best-effort)
         await self._redis.delete(_reservationCacheKey(reservation_id))
+        await self._redis.srem(_userIndexKey(user_id), str(reservation_id))

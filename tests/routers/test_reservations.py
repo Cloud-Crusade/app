@@ -41,7 +41,7 @@ async def test_post_reservations_returns_202_with_reservation_id(client, sqsMock
     assert body["reservation_id"]
     sqsMock.publish.assert_awaited_once()
     kwargs = sqsMock.publish.await_args.kwargs
-    assert kwargs["group_id"] == event_id   # FIFO group_id = event_id
+    assert kwargs["group_id"] == event_id  # FIFO group_id = event_id
     assert kwargs["dedup_id"] == body["reservation_id"]
     message = kwargs["message"]
     assert message["action"] == "reservation.create"
@@ -128,13 +128,14 @@ async def test_delete_reservation_publishes_cancel(client, sqsMock, coreSession)
     await coreSession.commit()
 
     response = await client.delete(
-        f"/reservations/{reservation.reservation_id}", headers=headers,
+        f"/reservations/{reservation.reservation_id}",
+        headers=headers,
     )
 
     assert response.status_code == 202
     sqsMock.publish.assert_awaited_once()
     kwargs = sqsMock.publish.await_args.kwargs
-    assert kwargs["group_id"] == str(reservation.event_id)   # FIFO group_id = event_id
+    assert kwargs["group_id"] == str(reservation.event_id)  # FIFO group_id = event_id
     assert kwargs["dedup_id"] == f"cancel:{reservation.reservation_id}"
     message = kwargs["message"]
     assert message["action"] == "reservation.cancel"
@@ -160,7 +161,8 @@ async def test_delete_other_users_reservation_returns_404(client, sqsMock, coreS
     await coreSession.commit()
 
     response = await client.delete(
-        f"/reservations/{reservation.reservation_id}", headers=headers,
+        f"/reservations/{reservation.reservation_id}",
+        headers=headers,
     )
 
     assert response.status_code == 404
@@ -181,13 +183,19 @@ async def test_get_my_reservations_returns_only_mine(client, coreSession):
     for i in range(2):
         coreSession.add(
             Reservation(
-                reservation_id=uuid4(), user_id=user_id, event_id=uuid4(), reserved_num=i + 1,
+                reservation_id=uuid4(),
+                user_id=user_id,
+                event_id=uuid4(),
+                reserved_num=i + 1,
             ),
         )
     # 다른 사용자 예매 — 응답에 포함되면 안 됨
     coreSession.add(
         Reservation(
-            reservation_id=uuid4(), user_id=uuid4(), event_id=uuid4(), reserved_num=99,
+            reservation_id=uuid4(),
+            user_id=uuid4(),
+            event_id=uuid4(),
+            reserved_num=99,
         ),
     )
     await coreSession.commit()
@@ -217,7 +225,66 @@ async def test_get_reservation_single_returns_404_for_other_owner(client, coreSe
     await coreSession.commit()
 
     response = await client.get(
-        f"/reservations/{reservation.reservation_id}", headers=headers,
+        f"/reservations/{reservation.reservation_id}",
+        headers=headers,
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_created_reservation_appears_in_list_before_db_persist(client, sqsMock):
+    """SQS→Lambda 미영속 상태에서도 per-user 캐시 인덱스 병합으로 목록에 노출."""
+    headers = await _login(client)
+    event_id = await _createEvent(client, headers)
+
+    create = await client.post(
+        "/reservations",
+        json={"event_id": event_id, "reserved_num": 2},
+        headers=headers,
+    )
+    assert create.status_code == 202
+    reservation_id = create.json()["reservation_id"]
+
+    listed = await client.get("/reservations", headers=headers)
+    assert listed.status_code == 200
+    body = listed.json()
+    ids = [item["reservation_id"] for item in body["items"]]
+    assert reservation_id in ids
+    assert body["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_pending_reservation_self_heals_when_persisted(client, sqsMock, coreSession):
+    """DB 영속(Lambda 처리 가정) 후에는 캐시 pending 과 중복 노출되지 않는다."""
+    from uuid import UUID
+
+    from app.domains.reservation.model import Reservation
+
+    headers = await _login(client)
+    event_id = await _createEvent(client, headers)
+    me = (await client.get("/users/me", headers=headers)).json()
+
+    create = await client.post(
+        "/reservations",
+        json={"event_id": event_id, "reserved_num": 1},
+        headers=headers,
+    )
+    reservation_id = create.json()["reservation_id"]
+
+    # Lambda 가 동일 id 로 DB 에 영속했다고 가정
+    coreSession.add(
+        Reservation(
+            reservation_id=UUID(reservation_id),
+            user_id=UUID(me["user_id"]),
+            event_id=UUID(event_id),
+            reserved_num=1,
+        ),
+    )
+    await coreSession.commit()
+
+    listed = await client.get("/reservations", headers=headers)
+    body = listed.json()
+    ids = [item["reservation_id"] for item in body["items"]]
+    assert ids.count(reservation_id) == 1
+    assert body["total"] == 1
