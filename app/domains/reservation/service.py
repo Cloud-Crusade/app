@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.errors import (
     EventNotFoundError,
     EventSoldOutError,
+    ReservationAlreadyCanceledError,
     ReservationNotFoundError,
     SeatAlreadyTakenError,
     SeatOutOfRangeError,
@@ -263,6 +264,10 @@ class ReservationWriteService:
         # 본인 예약만 취소 가능 (단순 owner check — 미존재와 동일하게 404 로 가린다)
         if reservation.user_id != user_id:
             raise ReservationNotFoundError(reservation_id=str(reservation_id))
+
+        # 이미 취소된 예매 재취소 차단 — 중복 cancel 발행 시 Lambda 가 좌석 카운터를 이중 복구
+        if reservation.is_canceled:
+            raise ReservationAlreadyCanceledError(reservation_id=str(reservation_id))
 
         message = ReservationCancelMessage(
             reservation_id=reservation_id,

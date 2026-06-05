@@ -66,6 +66,7 @@ async def createReservation(
     responses={
         401: {"description": "인증 필요"},
         404: {"description": "예매 없음 또는 본인 예약 아님"},
+        409: {"description": "이미 취소된 예매"},
     },
 )
 async def cancelReservation(

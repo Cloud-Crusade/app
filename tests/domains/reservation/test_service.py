@@ -325,6 +325,38 @@ async def test_request_cancel_pending_reservation_from_cache(coreSession, redis)
 
 
 @pytest.mark.asyncio
+async def test_request_cancel_already_canceled_raises_and_skips_publish(coreSession, redis):
+    # 이미 취소된 예매 재취소 — 중복 발행 차단 (Lambda 좌석 카운터 이중 복구 방지)
+    from app.common.errors import ReservationAlreadyCanceledError
+    from app.domains.reservation.model import Reservation
+
+    user_id = uuid4()
+    reservation = Reservation(
+        reservation_id=uuid4(),
+        user_id=user_id,
+        event_id=uuid4(),
+        reserved_num=1,
+        is_canceled=True,
+    )
+    coreSession.add(reservation)
+    await coreSession.commit()
+
+    sqs = AsyncMock()
+    sqs.publish = AsyncMock(return_value="m")
+    service = ReservationWriteService(
+        core_reader_session=coreSession,
+        reservation_reader_session=coreSession,
+        redis=redis,
+        sqs=sqs,
+    )
+
+    with pytest.raises(ReservationAlreadyCanceledError):
+        await service.requestCancel(user_id=user_id, reservation_id=reservation.reservation_id)
+
+    sqs.publish.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_get_by_id_cache_miss_then_populates_cache(coreSession, redis):
     from app.domains.reservation.model import Reservation
 
