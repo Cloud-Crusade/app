@@ -25,8 +25,12 @@ from app.settings import settings
 MAX_PAGE_SIZE = 100
 
 
+def _holdKeyPrefix(event_id: UUID) -> str:
+    return f"seat:hold:{event_id}:"
+
+
 def _holdKey(event_id: UUID, reserved_num: int) -> str:
-    return f"seat:hold:{event_id}:{reserved_num}"
+    return f"{_holdKeyPrefix(event_id)}{reserved_num}"
 
 
 def _remainKey(event_id: UUID) -> str:
@@ -106,6 +110,18 @@ class ReservationReadService:
             window.extend(pending[offset : offset + size])
         window.extend(db_reads[: size - len(window)])
         return window, db_total + pending_count
+
+    async def occupiedSeats(self, event_id: UUID) -> list[int]:
+        # 점유 좌석 = DB 비취소 예매 ∪ Redis 활성 hold(미영속분 포함)
+        occupied = await self._reservations.occupiedSeatNumbers(event_id)
+        if self._redis is not None:
+            prefix = _holdKeyPrefix(event_id)
+            async for key in self._redis.scan_iter(match=f"{prefix}*", count=100):
+                raw = key.decode() if isinstance(key, bytes) else key
+                suffix = raw.rsplit(":", 1)[-1]
+                if suffix.isdigit():
+                    occupied.add(int(suffix))
+        return sorted(occupied)
 
     async def _pendingReservations(self, user_id: UUID) -> list[ReservationRead]:
         # per-user 인덱스에서 미영속 예매만 추림. DB 영속분·만료분은 인덱스에서 정리(self-heal).
