@@ -171,6 +171,44 @@ async def test_delete_other_users_reservation_returns_404(client, sqsMock, coreS
 
 
 @pytest.mark.asyncio
+async def test_get_occupied_seats_returns_db_and_hold_seats(client, coreSession, redis):
+    from uuid import uuid4
+
+    from app.domains.reservation.model import Reservation
+    from app.domains.reservation.service import _holdKey
+
+    headers = await _login(client)
+    event_id = uuid4()
+    coreSession.add(
+        Reservation(reservation_id=uuid4(), user_id=uuid4(), event_id=event_id, reserved_num=4),
+    )
+    await coreSession.commit()
+    await redis.set(_holdKey(event_id, 7), str(uuid4()))
+
+    response = await client.get(
+        "/reservations/seats/occupied",
+        params={"event_id": str(event_id)},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["event_id"] == str(event_id)
+    assert body["occupied"] == [4, 7]
+
+
+@pytest.mark.asyncio
+async def test_get_occupied_seats_without_token_returns_401(client):
+    from uuid import uuid4
+
+    response = await client.get(
+        "/reservations/seats/occupied",
+        params={"event_id": str(uuid4())},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_get_my_reservations_returns_only_mine(client, coreSession):
     from uuid import UUID, uuid4
 

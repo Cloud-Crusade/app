@@ -14,6 +14,7 @@ from app.common.deps import (
 )
 from app.common.sqs import SqsPublisher
 from app.domains.reservation.schema import (
+    OccupiedSeats,
     ReservationAccepted,
     ReservationCreate,
     ReservationPage,
@@ -106,6 +107,22 @@ async def listMyReservations(
         user_id=user.user_id,
     )
     return ReservationPage(items=items, total=total, page=page, size=size)
+
+
+@router.get(
+    "/seats/occupied",
+    response_model=OccupiedSeats,
+    summary="이벤트 점유 좌석 조회 (좌석 선택용)",
+    responses={401: {"description": "인증 필요"}},
+)
+async def listOccupiedSeats(
+    event_id: UUID,
+    user: Annotated[User, Depends(getCurrentUser)],
+    session: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    redis: Annotated[Redis, Depends(getRedisClient)],
+) -> OccupiedSeats:
+    occupied = await ReservationReadService(session, redis).occupiedSeats(event_id)
+    return OccupiedSeats(event_id=event_id, occupied=occupied)
 
 
 @router.get(

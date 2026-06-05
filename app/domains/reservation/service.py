@@ -112,7 +112,7 @@ class ReservationReadService:
         return window, db_total + pending_count
 
     async def occupiedSeats(self, event_id: UUID) -> list[int]:
-        # 점유 좌석 = DB 비취소 예매 ∪ Redis 활성 hold(미영속분 포함)
+        # 점유 좌석 = DB 비취소 예매 + Redis 활성 hold(미영속분 포함) 합집합
         occupied = await self._reservations.occupiedSeatNumbers(event_id)
         if self._redis is not None:
             prefix = _holdKeyPrefix(event_id)
