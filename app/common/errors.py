@@ -63,6 +63,14 @@ class ReservationNotFoundError(DomainError):
         super().__init__("예매를 찾을 수 없습니다", reservation_id=reservation_id)
 
 
+class ReservationAlreadyCanceledError(DomainError):
+    status_code = 409
+    code = "RESERVATION_ALREADY_CANCELED"
+
+    def __init__(self, *, reservation_id: str) -> None:
+        super().__init__("이미 취소된 예매입니다", reservation_id=reservation_id)
+
+
 class SeatAlreadyTakenError(DomainError):
     status_code = 409
     code = "SEAT_ALREADY_TAKEN"
