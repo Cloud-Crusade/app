@@ -1,21 +1,23 @@
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.captcha import CHALLENGE_TTL_SECONDS, verifyPayload
 from app.common.db import (
     coreReaderFactory,
     coreWriterFactory,
     reservationReaderFactory,
     reservationWriterFactory,
 )
-from app.common.errors import UserNotFoundError
+from app.common.errors import CaptchaError, UserNotFoundError
 from app.common.redis import buildRedis
 from app.common.security import decodeToken
 from app.common.sqs import SqsPublisher, getReservationSqsPublisher
+from app.settings import settings
 
 bearerScheme = HTTPBearer(
     bearerFormat="JWT",
@@ -64,3 +66,20 @@ async def getCurrentUser(
     if user is None:
         raise UserNotFoundError(user_id=str(payload.user_id))
     return user
+
+
+async def verifyReservationCaptcha(
+    redis: Annotated[Redis, Depends(getRedisClient)],
+    x_captcha_token: Annotated[str | None, Header()] = None,
+) -> None:
+    # 플래그 off(기본) 면 캡차를 요구하지 않는다
+    if not settings.captcha_enabled:
+        return
+    if not x_captcha_token:
+        raise CaptchaError()
+    challenge = verifyPayload(x_captcha_token)
+    if challenge is None:
+        raise CaptchaError()
+    # 같은 challenge 재사용(replay) 방지 — 최초 1회만 통과
+    if not await redis.set(f"captcha:used:{challenge}", "1", nx=True, ex=CHALLENGE_TTL_SECONDS):
+        raise CaptchaError()

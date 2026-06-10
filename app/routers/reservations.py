@@ -11,6 +11,7 @@ from app.common.deps import (
     getRedisClient,
     getReservationReaderSession,
     getReservationSqs,
+    verifyReservationCaptcha,
 )
 from app.common.sqs import SqsPublisher
 from app.domains.reservation.schema import (
@@ -36,10 +37,12 @@ router = APIRouter(prefix="/reservations", tags=["reservations"])
     summary="예매 요청 (비동기 — SQS 발행)",
     responses={
         401: {"description": "인증 필요"},
+        403: {"description": "캡차 검증 실패"},
         404: {"description": "이벤트 없음"},
         409: {"description": "이미 선점된 좌석"},
         422: {"description": "요청 검증 실패"},
     },
+    dependencies=[Depends(verifyReservationCaptcha)],
 )
 async def createReservation(
     payload: ReservationCreate,

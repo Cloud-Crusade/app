@@ -17,7 +17,16 @@ from app.common.exception_handlers import (
     validationErrorHandler,
 )
 from app.common.logging import configureLogging
-from app.routers import auth, events, health, payments, queue, reservations, users
+from app.routers import (
+    auth,
+    captcha,
+    events,
+    health,
+    payments,
+    queue,
+    reservations,
+    users,
+)
 from app.settings import settings
 
 configureLogging(env=settings.env)
@@ -92,6 +101,7 @@ app.include_router(users.router)
 app.include_router(events.router)
 app.include_router(reservations.router)
 app.include_router(payments.router)
+app.include_router(captcha.router)
 
 # 대기열은 운영에서 API Gateway → ticketing Lambda 가 처리한다. dev/로컬 편의를 위한
 # in-memory 스텁을 dev/test 환경에서만 등록(운영 경로와 충돌·노출 방지).
