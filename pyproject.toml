@@ -33,6 +33,10 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+# MSA 전환: 서비스/공유 라이브러리를 uv workspace member 로 편입 (#44). 디렉터리는 단계별로 채워진다
+[tool.uv.workspace]
+members = ["services/*", "libs/*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

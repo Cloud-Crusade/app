@@ -26,3 +26,6 @@ venv/
 docker-compose.yml
 alembic/
 uv.lock
+
+# gRPC 스텁 (buf generate 로 로컬·CI 에서 생성)
+/gen/
