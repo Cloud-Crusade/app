@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - "feature/#44/msa-monorepo"   # MSA 통합 브랜치로 향하는 단계별 PR 도 테스트
 
 jobs:
   test:

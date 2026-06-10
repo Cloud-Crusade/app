@@ -1,0 +1,21 @@
+name: Proto CI
+
+on:
+  pull_request:
+    paths:
+      - "proto/**"
+      - "buf.yaml"
+      - "buf.gen.yaml"
+      - ".github/workflows/proto-ci.yml"
+
+jobs:
+  buf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-action@v1
+        with:
+          lint: true
+          format: true
+          breaking: true
+          push: false
