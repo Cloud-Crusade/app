@@ -42,11 +42,12 @@ router = APIRouter(prefix="/reservations", tags=["reservations"])
         409: {"description": "이미 선점된 좌석"},
         422: {"description": "요청 검증 실패"},
     },
-    dependencies=[Depends(verifyReservationCaptcha)],
 )
 async def createReservation(
     payload: ReservationCreate,
     user: Annotated[User, Depends(getCurrentUser)],
+    # 인증(getCurrentUser) 이후에 평가되도록 시그니처에 둠 — 미인증은 401 이 우선
+    _captcha: Annotated[None, Depends(verifyReservationCaptcha)],
     core_reader: Annotated[AsyncSession, Depends(getCoreReaderSession)],
     reservation_reader: Annotated[AsyncSession, Depends(getReservationReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],

@@ -8,6 +8,8 @@ os.environ.setdefault("RESERVATION_READER_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("JWT_SECRET", "test-secret-" + "x" * 32)
 os.environ.setdefault("SQS_RESERVATION_QUEUE_URL", "http://test/reservation-queue")
+# 로컬 .env 와 무관하게 테스트는 캡차 비활성 고정(결정성). 캡차 테스트는 monkeypatch 로 켠다
+os.environ.setdefault("CAPTCHA_ENABLED", "false")
 
 from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock

@@ -75,6 +75,9 @@ async def verifyReservationCaptcha(
     # 플래그 off(기본) 면 캡차를 요구하지 않는다
     if not settings.captcha_enabled:
         return
+    # 활성인데 시크릿 미설정이면 빈 HMAC 키로 우회 가능 → fail-closed(차단)
+    if not settings.captcha_hmac_secret:
+        raise CaptchaError()
     if not x_captcha_token:
         raise CaptchaError()
     challenge = verifyPayload(x_captcha_token)

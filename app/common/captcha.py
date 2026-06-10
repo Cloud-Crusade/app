@@ -41,15 +41,17 @@ def _sign(challenge: str) -> str:
 
 
 def buildChallenge() -> CaptchaChallenge:
-    # number 는 PoW 정답 — 클라이언트가 brute-force 로 찾는다(maxnumber 가 난이도)
-    number = secrets.randbelow(settings.captcha_complexity)
+    # number 는 PoW 정답 — 클라이언트가 0..maxnumber(포함) 에서 brute-force 로 찾는다
+    # complexity 0 이하면 randbelow 가 ValueError → 최소 1 로 보정
+    maxnumber = max(1, settings.captcha_complexity)
+    number = secrets.randbelow(maxnumber + 1)
     expires = int(time.time()) + CHALLENGE_TTL_SECONDS
     salt = f"{secrets.token_hex(12)}.{expires}"
     challenge = _sha256Hex(salt + str(number))
     return CaptchaChallenge(
         algorithm=ALGORITHM,
         challenge=challenge,
-        maxnumber=settings.captcha_complexity,
+        maxnumber=maxnumber,
         salt=salt,
         signature=_sign(challenge),
     )
@@ -58,7 +60,9 @@ def buildChallenge() -> CaptchaChallenge:
 def verifyPayload(token: str) -> str | None:
     """유효하면 재사용 방지 키로 쓸 challenge 해시를 반환, 무효면 None."""
     try:
-        data: Any = json.loads(base64.b64decode(token))
+        # 패딩 보정 + validate=True 로 엄격 디코딩(알파벳 외 문자/변형 거부)
+        padded = token + "=" * (-len(token) % 4)
+        data: Any = json.loads(base64.b64decode(padded, validate=True))
     except (ValueError, binascii.Error):
         return None
     if not isinstance(data, dict) or data.get("algorithm") != ALGORITHM:
