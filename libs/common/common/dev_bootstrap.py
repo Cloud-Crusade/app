@@ -2,13 +2,13 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.orm import DeclarativeBase
 
-from app.common.db import (
+from common.db import (
     CoreBase,
     ReservationBase,
     coreWriterEngine,
     reservationWriterEngine,
 )
-from app.settings import settings
+from common.settings import settings
 
 logger = structlog.get_logger()
 

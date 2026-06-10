@@ -16,6 +16,7 @@ dependencies = [
     "redis>=5.0",
     "aioboto3>=13.0",
     "structlog>=24.1",
+    "cc-common",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +37,9 @@ include = ["app*"]
 # MSA 전환: 서비스/공유 라이브러리를 uv workspace member 로 편입 (#44). 디렉터리는 단계별로 채워진다
 [tool.uv.workspace]
 members = ["services/*", "libs/*"]
+
+[tool.uv.sources]
+cc-common = { workspace = true }
 
 [tool.ruff]
 line-length = 100

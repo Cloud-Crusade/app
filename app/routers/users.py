@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.common.deps import getCurrentUser
+from app.deps import getCurrentUser
 from app.domains.user.model import User
 from app.domains.user.schema import UserRead
 

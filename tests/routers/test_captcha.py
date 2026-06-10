@@ -1,6 +1,5 @@
 import pytest
-
-from app.settings import settings
+from common.settings import settings
 
 SIGNUP = {"user_name": "capuser", "password": "password1234"}
 

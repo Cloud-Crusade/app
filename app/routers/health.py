@@ -1,15 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
-from redis.asyncio import Redis
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.common.deps import (
+from common.deps import (
     getCoreReaderSession,
     getRedisClient,
     getReservationReaderSession,
 )
+from fastapi import APIRouter, Depends, HTTPException
+from redis.asyncio import Redis
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["health"])
 

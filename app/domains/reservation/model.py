@@ -1,12 +1,11 @@
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
+from common.db import ReservationBase
 from sqlalchemy import Boolean, Date, Integer
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
-
-from app.common.db import ReservationBase
 
 
 class Reservation(ReservationBase):

@@ -1,10 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.common.errors import (
+from common.errors import (
     EventNotFoundError,
     EventSoldOutError,
     ReservationAlreadyCanceledError,
@@ -12,7 +9,11 @@ from app.common.errors import (
     SeatAlreadyTakenError,
     SeatOutOfRangeError,
 )
-from app.common.sqs import SqsPublisher
+from common.settings import settings
+from common.sqs import SqsPublisher
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.domains.event.repository import EventRepository
 from app.domains.reservation.messages import (
     ReservationCancelMessage,
@@ -20,7 +21,6 @@ from app.domains.reservation.messages import (
 )
 from app.domains.reservation.repository import ReservationRepository
 from app.domains.reservation.schema import ReservationCreate, ReservationRead
-from app.settings import settings
 
 MAX_PAGE_SIZE = 100
 

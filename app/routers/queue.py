@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.common.deps import getCurrentUser
+from app.deps import getCurrentUser
 from app.domains.user.model import User
 
 router = APIRouter(prefix="/queue", tags=["queue"])

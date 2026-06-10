@@ -1,9 +1,8 @@
 from uuid import uuid4
 
 import pytest
-
-from app.common.errors import InvalidTokenError
-from app.common.security import (
+from common.errors import InvalidTokenError
+from common.security import (
     decodeToken,
     hashPassword,
     issueAccessToken,
