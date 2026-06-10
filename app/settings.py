@@ -34,8 +34,14 @@ class Settings(BaseSettings):
     payment_cache_ttl_seconds: int = Field(default=3600, alias="PAYMENT_CACHE_TTL_SECONDS")
     # 예매는 취소로 변경 가능 → staleness 제한 위해 결제 캐시보다 짧게
     reservation_cache_ttl_seconds: int = Field(
-        default=300, alias="RESERVATION_CACHE_TTL_SECONDS",
+        default=300,
+        alias="RESERVATION_CACHE_TTL_SECONDS",
     )
+
+    # 봇/매크로 억제용 ALTCHA PoW 캡차 — 기본 off(키 미설정 시 영향 없음)
+    captcha_enabled: bool = Field(default=False, alias="CAPTCHA_ENABLED")
+    captcha_hmac_secret: str = Field(default="", alias="CAPTCHA_HMAC_SECRET")
+    captcha_complexity: int = Field(default=100_000, alias="CAPTCHA_COMPLEXITY")
 
 
 settings = Settings()

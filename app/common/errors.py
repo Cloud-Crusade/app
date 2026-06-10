@@ -111,3 +111,12 @@ class PaymentNotFoundError(DomainError):
 
     def __init__(self, *, payment_history_id: str) -> None:
         super().__init__("결제 내역을 찾을 수 없습니다", payment_history_id=payment_history_id)
+
+
+# === Captcha ===
+class CaptchaError(DomainError):
+    status_code = 403
+    code = "CAPTCHA_FAILED"
+
+    def __init__(self) -> None:
+        super().__init__("봇 방지 검증에 실패했습니다. 다시 시도해 주세요")
