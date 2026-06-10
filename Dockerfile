@@ -5,6 +5,7 @@ WORKDIR /app
 RUN pip install uv
 
 COPY pyproject.toml ./
+COPY libs ./libs
 COPY app ./app
 
 RUN uv sync
