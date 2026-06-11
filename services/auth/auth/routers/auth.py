@@ -1,6 +1,5 @@
 from typing import Annotated
 
-from common.deps import getCoreReaderSession, getCoreWriterSession
 from common.security import (
     decodeToken,
     issueAccessToken,
@@ -9,6 +8,7 @@ from common.security import (
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth.db import getReaderSession, getWriterSession
 from auth.domains.user.schema import (
     LoginRequest,
     RefreshRequest,
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 )
 async def signup(
     payload: SignupRequest,
-    session: Annotated[AsyncSession, Depends(getCoreWriterSession)],
+    session: Annotated[AsyncSession, Depends(getWriterSession)],
 ) -> UserRead:
     user = await UserService(session).signup(payload)
     return UserRead.model_validate(user)
@@ -47,7 +47,7 @@ async def signup(
 )
 async def login(
     payload: LoginRequest,
-    session: Annotated[AsyncSession, Depends(getCoreReaderSession)],
+    session: Annotated[AsyncSession, Depends(getReaderSession)],
 ) -> TokenPair:
     user = await UserService(session).authenticate(
         user_name=payload.user_name, password=payload.password,

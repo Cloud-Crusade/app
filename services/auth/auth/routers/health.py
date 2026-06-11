@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from common.deps import getCoreReaderSession
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from auth.db import getReaderSession
 
 router = APIRouter(tags=["health"])
 
@@ -19,7 +20,7 @@ async def liveness() -> dict[str, str]:
     responses={503: {"description": "의존성 미준비"}},
 )
 async def readiness(
-    core: Annotated[AsyncSession, Depends(getCoreReaderSession)],
+    core: Annotated[AsyncSession, Depends(getReaderSession)],
 ) -> dict[str, str]:
     try:
         await core.execute(text("SELECT 1"))

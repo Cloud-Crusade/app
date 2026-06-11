@@ -1,14 +1,15 @@
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from common.db import ReservationBase
 from sqlalchemy import Date, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
+from payment.db import Base
 
-class PaymentHistory(ReservationBase):
+
+class PaymentHistory(Base):
     __tablename__ = "payment_histories"
 
     payment_history_id: Mapped[UUID] = mapped_column(

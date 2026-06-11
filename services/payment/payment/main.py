@@ -4,6 +4,7 @@ from connector.pool import GrpcChannelPool
 from fastapi import FastAPI
 
 from payment.clients import ReservationClient, setReservationClient
+from payment.db import Base, writerEngine
 from payment.routers import health, payments
 
 
@@ -21,6 +22,7 @@ async def _shutdown(app: FastAPI) -> None:
 app = createApp(
     title="Payment Service",
     routers=[health.router, payments.router],
+    dev_schema=(Base.metadata, writerEngine),
     on_startup=_startup,
     on_shutdown=_shutdown,
 )

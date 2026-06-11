@@ -3,6 +3,7 @@ from config.settings import settings
 from connector.server import startServer
 from fastapi import FastAPI
 
+from event.db import Base, writerEngine
 from event.grpc_server import registerEventService
 from event.routers import events, health
 
@@ -19,6 +20,7 @@ async def _shutdown(app: FastAPI) -> None:
 app = createApp(
     title="Event Service",
     routers=[health.router, events.router],
+    dev_schema=(Base.metadata, writerEngine),
     on_startup=_startup,
     on_shutdown=_shutdown,
 )

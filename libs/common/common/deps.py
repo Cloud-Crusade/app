@@ -1,41 +1,13 @@
-from collections.abc import AsyncIterator
 from typing import Annotated
 
 from config.settings import settings
 from fastapi import Depends, Header
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.captcha import CHALLENGE_TTL_SECONDS, verifyPayload
-from common.db import (
-    coreReaderFactory,
-    coreWriterFactory,
-    reservationReaderFactory,
-    reservationWriterFactory,
-)
 from common.errors import CaptchaError
 from common.redis import buildRedis
 from common.sqs import SqsPublisher, getReservationSqsPublisher
-
-
-async def getCoreWriterSession() -> AsyncIterator[AsyncSession]:
-    async with coreWriterFactory() as session:
-        yield session
-
-
-async def getCoreReaderSession() -> AsyncIterator[AsyncSession]:
-    async with coreReaderFactory() as session:
-        yield session
-
-
-async def getReservationWriterSession() -> AsyncIterator[AsyncSession]:
-    async with reservationWriterFactory() as session:
-        yield session
-
-
-async def getReservationReaderSession() -> AsyncIterator[AsyncSession]:
-    async with reservationReaderFactory() as session:
-        yield session
 
 
 def getRedisClient() -> Redis:

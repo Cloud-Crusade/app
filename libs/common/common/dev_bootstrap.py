@@ -1,14 +1,7 @@
 import structlog
 from config.settings import settings
+from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import AsyncEngine
-from sqlalchemy.orm import DeclarativeBase
-
-from common.db import (
-    CoreBase,
-    ReservationBase,
-    coreWriterEngine,
-    reservationWriterEngine,
-)
 
 logger = structlog.get_logger()
 
@@ -16,20 +9,10 @@ logger = structlog.get_logger()
 DEV_ENVS = frozenset({"development", "test"})
 
 
-async def _createAll(engine: AsyncEngine, base: type[DeclarativeBase]) -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(base.metadata.create_all)
-
-
-async def initDevSchemaIfEnabled() -> None:
+async def initDevSchemaIfEnabled(metadata: MetaData, engine: AsyncEngine) -> None:
     if settings.env not in DEV_ENVS:
         logger.info("dev_schema_init_skipped", env=settings.env)
         return
-    await _createAll(coreWriterEngine, CoreBase)
-    await _createAll(reservationWriterEngine, ReservationBase)
-    logger.info(
-        "dev_schema_initialized",
-        env=settings.env,
-        core_tables=sorted(CoreBase.metadata.tables.keys()),
-        reservation_tables=sorted(ReservationBase.metadata.tables.keys()),
-    )
+    async with engine.begin() as conn:
+        await conn.run_sync(metadata.create_all)
+    logger.info("dev_schema_initialized", env=settings.env, tables=sorted(metadata.tables.keys()))

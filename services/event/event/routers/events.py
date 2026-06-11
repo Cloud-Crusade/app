@@ -2,13 +2,10 @@ from typing import Annotated
 from uuid import UUID
 
 from common.auth import getCurrentUserId
-from common.deps import (
-    getCoreReaderSession,
-    getCoreWriterSession,
-)
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from event.db import getReaderSession, getWriterSession
 from event.domains.event.schema import (
     EventCreate,
     EventPage,
@@ -22,7 +19,7 @@ router = APIRouter(prefix="/events", tags=["events"])
 
 @router.get("", response_model=EventPage, summary="행사 목록 조회 (페이지네이션)")
 async def listEvents(
-    session: Annotated[AsyncSession, Depends(getCoreReaderSession)],
+    session: Annotated[AsyncSession, Depends(getReaderSession)],
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> EventPage:
@@ -43,7 +40,7 @@ async def listEvents(
 )
 async def getEvent(
     event_id: UUID,
-    session: Annotated[AsyncSession, Depends(getCoreReaderSession)],
+    session: Annotated[AsyncSession, Depends(getReaderSession)],
 ) -> EventRead:
     event = await EventService(session).getById(event_id)
     return EventRead.model_validate(event)
@@ -62,7 +59,7 @@ async def getEvent(
 async def createEvent(
     payload: EventCreate,
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    session: Annotated[AsyncSession, Depends(getCoreWriterSession)],
+    session: Annotated[AsyncSession, Depends(getWriterSession)],
 ) -> EventRead:
     event = await EventService(session).create(user_id=user_id, payload=payload)
     return EventRead.model_validate(event)
@@ -82,7 +79,7 @@ async def updateEvent(
     event_id: UUID,
     payload: EventUpdate,
     _user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    session: Annotated[AsyncSession, Depends(getCoreWriterSession)],
+    session: Annotated[AsyncSession, Depends(getWriterSession)],
 ) -> EventRead:
     event = await EventService(session).update(event_id=event_id, payload=payload)
     return EventRead.model_validate(event)
@@ -100,6 +97,6 @@ async def updateEvent(
 async def deleteEvent(
     event_id: UUID,
     _user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    session: Annotated[AsyncSession, Depends(getCoreWriterSession)],
+    session: Annotated[AsyncSession, Depends(getWriterSession)],
 ) -> None:
     await EventService(session).delete(event_id=event_id)
