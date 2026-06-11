@@ -1,4 +1,5 @@
 import structlog
+from config.settings import settings
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -8,7 +9,6 @@ from common.db import (
     coreWriterEngine,
     reservationWriterEngine,
 )
-from common.settings import settings
 
 logger = structlog.get_logger()
 

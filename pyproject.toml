@@ -1,25 +1,8 @@
-[project]
-name = "ticketing"
-version = "0.1.0"
-description = "티켓팅 서비스 백엔드 (인프라 검증 베드)"
-requires-python = ">=3.12"
-dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.30",
-    "sqlalchemy>=2.0",
-    "asyncpg>=0.29",
-    "alembic>=1.13",
-    "pydantic>=2.7",
-    "pydantic-settings>=2.3",
-    "pyjwt>=2.9",
-    "bcrypt>=4.2",
-    "redis>=5.0",
-    "aioboto3>=13.0",
-    "structlog>=24.1",
-    "cc-common",
-]
+# MSA 전환(#44): 루트는 가상 워크스페이스 루트. 앱 코드는 services/* · libs/* 에 있다
+[tool.uv.workspace]
+members = ["services/*", "libs/*"]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
@@ -31,16 +14,6 @@ dev = [
     "mypy>=1.10",
 ]
 
-[tool.setuptools.packages.find]
-include = ["app*"]
-
-# MSA 전환: 서비스/공유 라이브러리를 uv workspace member 로 편입 (#44). 디렉터리는 단계별로 채워진다
-[tool.uv.workspace]
-members = ["services/*", "libs/*"]
-
-[tool.uv.sources]
-cc-common = { workspace = true }
-
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -50,15 +23,16 @@ select = ["E", "F", "I", "B", "C4", "UP", "T20", "SIM", "RUF"]
 ignore = ["N802", "N803", "N806"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/conftest.py" = ["E402"]  # os.environ.setdefault 가 import 보다 먼저 와야 함
+"**/conftest.py" = ["E402"]  # os.environ.setdefault 가 import 보다 먼저 와야 함
 
 [tool.ruff.format]
 quote-style = "double"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
-addopts = "-ra --strict-markers --strict-config"
+testpaths = ["services", "libs"]
+# 서비스 간 동일 basename(test_service.py) 충돌 방지
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 
 [tool.mypy]
 python_version = "3.12"

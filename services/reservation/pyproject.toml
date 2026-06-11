@@ -1,0 +1,24 @@
+[project]
+name = "cc-reservation"
+version = "0.1.0"
+description = "예약 관리 서비스 (좌석 hold·예매·취소·조회)"
+requires-python = ">=3.12"
+dependencies = [
+    "cc-common",
+    "cc-config",
+    "cc-event",
+    "uvicorn[standard]>=0.30",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["reservation*"]
+
+# cc-event 는 #48 에서 gRPC 로 대체될 임시 직접 의존 (Event 조회)
+[tool.uv.sources]
+cc-common = { workspace = true }
+cc-config = { workspace = true }
+cc-event = { workspace = true }

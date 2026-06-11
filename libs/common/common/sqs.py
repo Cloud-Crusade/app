@@ -3,8 +3,7 @@ from typing import Any
 
 import aioboto3
 import structlog
-
-from common.settings import settings
+from config.settings import settings
 
 logger = structlog.get_logger()
 

@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 
+from config.settings import settings
 from sqlalchemy import DateTime, MetaData
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -9,8 +10,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
-
-from common.settings import settings
 
 _NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
