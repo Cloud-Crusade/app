@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, Query, status
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from payment.clients import ReservationClient, getReservationClient
 from payment.domains.payment.schema import (
     PaymentAccepted,
     PaymentCreate,
@@ -38,12 +39,12 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 async def createPayment(
     payload: PaymentCreate,
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    reservation_reader: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    reservation_client: Annotated[ReservationClient, Depends(getReservationClient)],
     redis: Annotated[Redis, Depends(getRedisClient)],
     sqs: Annotated[SqsPublisher, Depends(getReservationSqs)],
 ) -> PaymentAccepted:
     service = PaymentWriteService(
-        reservation_reader_session=reservation_reader, redis=redis, sqs=sqs,
+        reservation_client=reservation_client, redis=redis, sqs=sqs,
     )
     payment_history_id = await service.requestCreate(user_id=user_id, payload=payload)
     return PaymentAccepted(payment_history_id=payment_history_id)

@@ -1,6 +1,6 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date
 from unittest.mock import AsyncMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from common.errors import (
@@ -10,7 +10,6 @@ from common.errors import (
     SeatAlreadyTakenError,
     SeatOutOfRangeError,
 )
-from event.domains.event.model import Event
 from reservation.domains.reservation.schema import ReservationCreate, ReservationRead
 from reservation.domains.reservation.service import (
     ReservationReadService,
@@ -21,33 +20,26 @@ from reservation.domains.reservation.service import (
 )
 
 
-async def _seedEvent(session, *, total_seats: int = 100) -> Event:
-    start = datetime(2026, 12, 1, 19, 0, tzinfo=UTC)
-    event = Event(
-        user_id=uuid4(),
-        title="공연",
-        body=None,
-        schedule={
-            "start_at": start.isoformat(),
-            "end_at": (start + timedelta(hours=2)).isoformat(),
-        },
-        img_urls=[],
-        total_seats=total_seats,
-    )
-    session.add(event)
-    await session.flush()
-    return event
+class FakeEventClient:
+    def __init__(self, total_seats: int | None = 100) -> None:
+        self._total_seats = total_seats
+
+    async def getTotalSeats(self, event_id: UUID) -> int | None:
+        return self._total_seats
+
+
 
 
 @pytest.mark.asyncio
 async def test_request_create_publishes_to_sqs_when_seat_free(coreSession, redis):
-    event = await _seedEvent(coreSession)
+    event_id = uuid4()
+    event_client = FakeEventClient()
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="msg-1")
     user_id = uuid4()
 
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -55,26 +47,27 @@ async def test_request_create_publishes_to_sqs_when_seat_free(coreSession, redis
 
     reservation_id = await service.requestCreate(
         user_id=user_id,
-        payload=ReservationCreate(event_id=event.event_id, reserved_num=7),
+        payload=ReservationCreate(event_id=event_id, reserved_num=7),
     )
 
     assert reservation_id
     sqs.publish.assert_awaited_once()
     kwargs = sqs.publish.await_args.kwargs
-    assert kwargs["group_id"] == str(event.event_id)   # 같은 이벤트끼리 group
+    assert kwargs["group_id"] == str(event_id)   # 같은 이벤트끼리 group
     assert kwargs["dedup_id"] == str(reservation_id)
     message = kwargs["message"]
     assert message["action"] == "reservation.create"
     assert message["reservation_id"] == str(reservation_id)
     assert message["reserved_num"] == 7
-    assert await redis.get(_holdKey(event.event_id, 7)) == str(user_id)
+    assert await redis.get(_holdKey(event_id, 7)) == str(user_id)
 
 
 @pytest.mark.asyncio
 async def test_request_create_when_event_missing_raises(coreSession, redis):
+    event_client = FakeEventClient(total_seats=None)
     sqs = AsyncMock()
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -90,10 +83,11 @@ async def test_request_create_when_event_missing_raises(coreSession, redis):
 
 @pytest.mark.asyncio
 async def test_request_create_when_seat_already_held_raises(coreSession, redis):
-    event = await _seedEvent(coreSession)
+    event_id = uuid4()
+    event_client = FakeEventClient()
     sqs = AsyncMock()
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -101,14 +95,14 @@ async def test_request_create_when_seat_already_held_raises(coreSession, redis):
 
     await service.requestCreate(
         user_id=uuid4(),
-        payload=ReservationCreate(event_id=event.event_id, reserved_num=5),
+        payload=ReservationCreate(event_id=event_id, reserved_num=5),
     )
     sqs.publish.reset_mock()
 
     with pytest.raises(SeatAlreadyTakenError) as exc:
         await service.requestCreate(
             user_id=uuid4(),
-            payload=ReservationCreate(event_id=event.event_id, reserved_num=5),
+            payload=ReservationCreate(event_id=event_id, reserved_num=5),
         )
     assert exc.value.details["reserved_num"] == 5
     sqs.publish.assert_not_awaited()
@@ -124,11 +118,12 @@ async def test_get_by_id_missing_raises(coreSession):
 
 @pytest.mark.asyncio
 async def test_request_create_decrements_remain_counter(coreSession, redis):
-    event = await _seedEvent(coreSession, total_seats=10)
+    event_id = uuid4()
+    event_client = FakeEventClient(total_seats=10)
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="m")
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -136,19 +131,20 @@ async def test_request_create_decrements_remain_counter(coreSession, redis):
 
     await service.requestCreate(
         user_id=uuid4(),
-        payload=ReservationCreate(event_id=event.event_id, reserved_num=1),
+        payload=ReservationCreate(event_id=event_id, reserved_num=1),
     )
 
-    remain = int(await redis.get(_remainKey(event.event_id)))
+    remain = int(await redis.get(_remainKey(event_id)))
     assert remain == 9  # 10 → DECR 한 번
 
 
 @pytest.mark.asyncio
 async def test_request_create_rejects_seat_above_total(coreSession, redis):
-    event = await _seedEvent(coreSession, total_seats=5)
+    event_id = uuid4()
+    event_client = FakeEventClient(total_seats=5)
     sqs = AsyncMock()
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -157,21 +153,22 @@ async def test_request_create_rejects_seat_above_total(coreSession, redis):
     with pytest.raises(SeatOutOfRangeError) as exc:
         await service.requestCreate(
             user_id=uuid4(),
-            payload=ReservationCreate(event_id=event.event_id, reserved_num=99),
+            payload=ReservationCreate(event_id=event_id, reserved_num=99),
         )
     assert exc.value.details["total_seats"] == 5
     sqs.publish.assert_not_awaited()
     # 범위 위반은 카운터 DECR 전이라 잔여가 줄지 않아야 함
-    assert await redis.get(_remainKey(event.event_id)) is None
+    assert await redis.get(_remainKey(event_id)) is None
 
 
 @pytest.mark.asyncio
 async def test_request_create_sold_out_when_counter_exhausted(coreSession, redis):
-    event = await _seedEvent(coreSession, total_seats=2)
+    event_id = uuid4()
+    event_client = FakeEventClient(total_seats=2)
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="m")
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -179,10 +176,10 @@ async def test_request_create_sold_out_when_counter_exhausted(coreSession, redis
 
     # 좌석 1, 2 정상 점유
     await service.requestCreate(
-        user_id=uuid4(), payload=ReservationCreate(event_id=event.event_id, reserved_num=1),
+        user_id=uuid4(), payload=ReservationCreate(event_id=event_id, reserved_num=1),
     )
     await service.requestCreate(
-        user_id=uuid4(), payload=ReservationCreate(event_id=event.event_id, reserved_num=2),
+        user_id=uuid4(), payload=ReservationCreate(event_id=event_id, reserved_num=2),
     )
     sqs.publish.reset_mock()
 
@@ -190,25 +187,26 @@ async def test_request_create_sold_out_when_counter_exhausted(coreSession, redis
     # → total_seats=2 라 reserved_num 은 1 또는 2 만 가능. 카운터 매진 검증을 위해
     # 다른 좌석 번호로 시도하더라도 같은 결과 (SeatAlreadyTaken)
     # 매진 자체 검증은 hold 우회 시점만 가능하므로, 카운터 직접 0 셋팅 후 검증
-    await redis.set(_remainKey(event.event_id), 0)
+    await redis.set(_remainKey(event_id), 0)
 
     with pytest.raises(EventSoldOutError):
         await service.requestCreate(
             user_id=uuid4(),
-            payload=ReservationCreate(event_id=event.event_id, reserved_num=1),
+            payload=ReservationCreate(event_id=event_id, reserved_num=1),
         )
     sqs.publish.assert_not_awaited()
     # 매진 검증 후 카운터는 0 으로 복구되어야 함
-    assert int(await redis.get(_remainKey(event.event_id))) == 0
+    assert int(await redis.get(_remainKey(event_id))) == 0
 
 
 @pytest.mark.asyncio
 async def test_request_create_seat_taken_restores_counter(coreSession, redis):
-    event = await _seedEvent(coreSession, total_seats=10)
+    event_id = uuid4()
+    event_client = FakeEventClient(total_seats=10)
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="m")
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -216,27 +214,28 @@ async def test_request_create_seat_taken_restores_counter(coreSession, redis):
 
     await service.requestCreate(
         user_id=uuid4(),
-        payload=ReservationCreate(event_id=event.event_id, reserved_num=5),
+        payload=ReservationCreate(event_id=event_id, reserved_num=5),
     )
-    remain_after_first = int(await redis.get(_remainKey(event.event_id)))
+    remain_after_first = int(await redis.get(_remainKey(event_id)))
     assert remain_after_first == 9
 
     # 같은 좌석 다시 시도 → SeatAlreadyTaken. 카운터는 복구되어야 (9 유지)
     with pytest.raises(SeatAlreadyTakenError):
         await service.requestCreate(
             user_id=uuid4(),
-            payload=ReservationCreate(event_id=event.event_id, reserved_num=5),
+            payload=ReservationCreate(event_id=event_id, reserved_num=5),
         )
-    assert int(await redis.get(_remainKey(event.event_id))) == 9
+    assert int(await redis.get(_remainKey(event_id))) == 9
 
 
 @pytest.mark.asyncio
 async def test_request_create_sqs_failure_restores_both_hold_and_counter(coreSession, redis):
-    event = await _seedEvent(coreSession, total_seats=10)
+    event_id = uuid4()
+    event_client = FakeEventClient(total_seats=10)
     sqs = AsyncMock()
     sqs.publish = AsyncMock(side_effect=RuntimeError("sqs down"))
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -245,16 +244,17 @@ async def test_request_create_sqs_failure_restores_both_hold_and_counter(coreSes
     with pytest.raises(RuntimeError):
         await service.requestCreate(
             user_id=uuid4(),
-            payload=ReservationCreate(event_id=event.event_id, reserved_num=3),
+            payload=ReservationCreate(event_id=event_id, reserved_num=3),
         )
 
     # 양쪽 모두 보상되어야 함
-    assert await redis.get(_holdKey(event.event_id, 3)) is None
-    assert int(await redis.get(_remainKey(event.event_id))) == 10
+    assert await redis.get(_holdKey(event_id, 3)) is None
+    assert int(await redis.get(_remainKey(event_id))) == 10
 
 
 @pytest.mark.asyncio
 async def test_request_cancel_publishes_with_group_id(coreSession, redis):
+    event_client = FakeEventClient()
     from uuid import uuid4
 
     from reservation.domains.reservation.model import Reservation
@@ -269,7 +269,7 @@ async def test_request_cancel_publishes_with_group_id(coreSession, redis):
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="msg-c")
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -289,6 +289,7 @@ async def test_request_cancel_publishes_with_group_id(coreSession, redis):
 
 @pytest.mark.asyncio
 async def test_request_cancel_pending_reservation_from_cache(coreSession, redis):
+    event_client = FakeEventClient()
     # 미영속(DB 미반영) 예매 — 캐시에만 존재해도 취소 가능해야 함 (cache-first)
     user_id = uuid4()
     event_id = uuid4()
@@ -307,7 +308,7 @@ async def test_request_cancel_pending_reservation_from_cache(coreSession, redis)
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="msg-c")
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,  # DB 에는 없음
         redis=redis,
         sqs=sqs,
@@ -325,6 +326,7 @@ async def test_request_cancel_pending_reservation_from_cache(coreSession, redis)
 
 @pytest.mark.asyncio
 async def test_request_cancel_already_canceled_raises_and_skips_publish(coreSession, redis):
+    event_client = FakeEventClient()
     # 이미 취소된 예매 재취소 — 중복 발행 차단 (Lambda 좌석 카운터 이중 복구 방지)
     from common.errors import ReservationAlreadyCanceledError
     from reservation.domains.reservation.model import Reservation
@@ -343,7 +345,7 @@ async def test_request_cancel_already_canceled_raises_and_skips_publish(coreSess
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="m")
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -446,7 +448,7 @@ async def test_request_cancel_invalidates_cache(coreSession, redis):
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="m")
     write = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=FakeEventClient(),
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -459,12 +461,13 @@ async def test_request_cancel_invalidates_cache(coreSession, redis):
 @pytest.mark.asyncio
 async def test_request_create_populates_reservation_cache(coreSession, redis):
     # 생성 시 낙관적 캐시 적재 — Lambda DB write 전에도 결제 검증이 hit 하도록
-    event = await _seedEvent(coreSession)
+    event_id = uuid4()
+    event_client = FakeEventClient()
     sqs = AsyncMock()
     sqs.publish = AsyncMock(return_value="m")
     user_id = uuid4()
     service = ReservationWriteService(
-        core_reader_session=coreSession,
+        event_client=event_client,
         reservation_reader_session=coreSession,
         redis=redis,
         sqs=sqs,
@@ -472,7 +475,7 @@ async def test_request_create_populates_reservation_cache(coreSession, redis):
 
     reservation_id = await service.requestCreate(
         user_id=user_id,
-        payload=ReservationCreate(event_id=event.event_id, reserved_num=3),
+        payload=ReservationCreate(event_id=event_id, reserved_num=3),
     )
 
     cached = await redis.get(_reservationCacheKey(reservation_id))

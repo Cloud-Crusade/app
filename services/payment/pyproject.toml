@@ -6,7 +6,8 @@ requires-python = ">=3.12"
 dependencies = [
     "cc-common",
     "cc-config",
-    "cc-reservation",
+    "cc-connector",
+    "cc-protos",
     "uvicorn[standard]>=0.30",
 ]
 
@@ -17,8 +18,8 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["payment*"]
 
-# cc-reservation 은 #48 에서 gRPC 로 대체될 임시 직접 의존 (Reservation 조회)
 [tool.uv.sources]
 cc-common = { workspace = true }
 cc-config = { workspace = true }
-cc-reservation = { workspace = true }
+cc-connector = { workspace = true }
+cc-protos = { workspace = true }

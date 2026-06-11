@@ -3,7 +3,6 @@ from uuid import UUID
 
 from common.auth import getCurrentUserId
 from common.deps import (
-    getCoreReaderSession,
     getRedisClient,
     getReservationReaderSession,
     getReservationSqs,
@@ -14,6 +13,7 @@ from fastapi import APIRouter, Depends, Query, status
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from reservation.clients import EventClient, getEventClient
 from reservation.domains.reservation.schema import (
     OccupiedSeats,
     ReservationAccepted,
@@ -47,13 +47,13 @@ async def createReservation(
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
     # 인증(getCurrentUserId) 이후에 평가되도록 시그니처에 둠 — 미인증은 401 이 우선
     _captcha: Annotated[None, Depends(verifyReservationCaptcha)],
-    core_reader: Annotated[AsyncSession, Depends(getCoreReaderSession)],
+    event_client: Annotated[EventClient, Depends(getEventClient)],
     reservation_reader: Annotated[AsyncSession, Depends(getReservationReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
     sqs: Annotated[SqsPublisher, Depends(getReservationSqs)],
 ) -> ReservationAccepted:
     service = ReservationWriteService(
-        core_reader_session=core_reader,
+        event_client=event_client,
         reservation_reader_session=reservation_reader,
         redis=redis,
         sqs=sqs,
@@ -76,13 +76,13 @@ async def createReservation(
 async def cancelReservation(
     reservation_id: UUID,
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    core_reader: Annotated[AsyncSession, Depends(getCoreReaderSession)],
+    event_client: Annotated[EventClient, Depends(getEventClient)],
     reservation_reader: Annotated[AsyncSession, Depends(getReservationReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
     sqs: Annotated[SqsPublisher, Depends(getReservationSqs)],
 ) -> ReservationAccepted:
     service = ReservationWriteService(
-        core_reader_session=core_reader,
+        event_client=event_client,
         reservation_reader_session=reservation_reader,
         redis=redis,
         sqs=sqs,
