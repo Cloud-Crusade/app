@@ -38,7 +38,7 @@ jobs:
         run: docker push ${{ steps.login-ecr.outputs.registry }}/ticketing-app:latest
 
       - name: deploy to eks
+        if: ${{ vars.EKS_ENABLED == 'true' }}
         run: |
           aws eks update-kubeconfig --region ap-northeast-2 --name cc-dev-eks
           kubectl rollout restart deployment/ticketing-app -n default
-
