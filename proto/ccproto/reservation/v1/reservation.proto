@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package ccproto.reservation.v1;
+
+// 결제 서비스가 예매 소유자 검증을 위해 호출 (#48: payment→reservation 직접호출 대체)
+service ReservationService {
+  rpc GetReservation(GetReservationRequest) returns (GetReservationResponse);
+}
+
+message GetReservationRequest {
+  string reservation_id = 1;
+}
+
+message GetReservationResponse {
+  string reservation_id = 1;
+  string user_id = 2;
+}

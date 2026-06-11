@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -35,15 +35,27 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
             structlog.contextvars.clear_contextvars()
 
 
-@asynccontextmanager
-async def _lifespan(_app: FastAPI) -> Any:
-    await initDevSchemaIfEnabled()
-    yield
+def createApp(
+    *,
+    title: str,
+    routers: Sequence[APIRouter],
+    on_startup: Callable[[FastAPI], Awaitable[None]] | None = None,
+    on_shutdown: Callable[[FastAPI], Awaitable[None]] | None = None,
+    **kwargs: Any,
+) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        await initDevSchemaIfEnabled()
+        if on_startup is not None:
+            await on_startup(app)
+        try:
+            yield
+        finally:
+            if on_shutdown is not None:
+                await on_shutdown(app)
 
-
-def createApp(*, title: str, routers: Sequence[APIRouter], **kwargs: Any) -> FastAPI:
     configureLogging(env=settings.env)
-    app = FastAPI(title=title, version="0.1.0", lifespan=_lifespan, **kwargs)
+    app = FastAPI(title=title, version="0.1.0", lifespan=lifespan, **kwargs)
     app.add_middleware(RequestIdMiddleware)
     # CORS 는 가장 바깥에서 preflight(OPTIONS)를 먼저 처리하도록 마지막에 등록
     app.add_middleware(

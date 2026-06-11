@@ -1,0 +1,16 @@
+[project]
+name = "cc-protos"
+version = "0.1.0"
+description = "gRPC 생성 스텁 (buf generate 산출물, ccproto.*)"
+requires-python = ">=3.12"
+dependencies = [
+    "protobuf>=5.27",
+    "grpcio>=1.66",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["ccproto*"]
