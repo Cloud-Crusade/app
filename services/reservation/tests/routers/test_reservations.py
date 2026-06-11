@@ -2,33 +2,21 @@ from uuid import UUID, uuid4
 
 import pytest
 from common.security import issueAccessToken
-from event.domains.event.model import Event
 
-# 서비스 분할: auth/event 는 별도 서비스 → 토큰은 직접 발급, Event 는 DB 에 직접 seed
+# 서비스 분할: auth/event 는 별도 서비스 → 토큰은 직접 발급, Event 는 gRPC fake(conftest)로 응답
 USER_ID = uuid4()
-SAMPLE_SCHEDULE = {
-    "start_at": "2026-12-01T19:00:00+00:00",
-    "end_at": "2026-12-01T21:00:00+00:00",
-}
 
 
 def _headers(user_id: UUID = USER_ID) -> dict[str, str]:
     return {"authorization": f"Bearer {issueAccessToken(user_id)}"}
 
 
-async def _seedEvent(session, *, total_seats: int = 100) -> str:
-    event = Event(
-        user_id=USER_ID, title="공연 A", schedule=SAMPLE_SCHEDULE, total_seats=total_seats,
-    )
-    session.add(event)
-    await session.commit()
-    return str(event.event_id)
 
 
 @pytest.mark.asyncio
 async def test_post_reservations_returns_202_with_reservation_id(client, sqsMock, coreSession):
     headers = _headers()
-    event_id = await _seedEvent(coreSession)
+    event_id = str(uuid4())
 
     response = await client.post(
         "/reservations",
@@ -75,7 +63,7 @@ async def test_post_reservations_when_event_missing_returns_404(client, sqsMock)
 @pytest.mark.asyncio
 async def test_post_reservations_when_seat_taken_returns_409(client, sqsMock, coreSession):
     headers = _headers()
-    event_id = await _seedEvent(coreSession)
+    event_id = str(uuid4())
 
     first = await client.post(
         "/reservations",
@@ -98,7 +86,7 @@ async def test_post_reservations_when_seat_taken_returns_409(client, sqsMock, co
 @pytest.mark.asyncio
 async def test_post_reservations_invalid_reserved_num_returns_422(client, coreSession):
     headers = _headers()
-    event_id = await _seedEvent(coreSession)
+    event_id = str(uuid4())
     response = await client.post(
         "/reservations",
         json={"event_id": event_id, "reserved_num": 0},
@@ -273,7 +261,7 @@ async def test_get_reservation_single_returns_404_for_other_owner(client, coreSe
 async def test_created_reservation_appears_in_list_before_db_persist(client, sqsMock, coreSession):
     """SQS→Lambda 미영속 상태에서도 per-user 캐시 인덱스 병합으로 목록에 노출."""
     headers = _headers()
-    event_id = await _seedEvent(coreSession)
+    event_id = str(uuid4())
 
     create = await client.post(
         "/reservations",
@@ -299,7 +287,7 @@ async def test_pending_reservation_self_heals_when_persisted(client, sqsMock, co
     from reservation.domains.reservation.model import Reservation
 
     headers = _headers()
-    event_id = await _seedEvent(coreSession)
+    event_id = str(uuid4())
 
     create = await client.post(
         "/reservations",

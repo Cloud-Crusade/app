@@ -11,10 +11,10 @@ from common.errors import (
 )
 from common.sqs import SqsPublisher
 from config.settings import settings
-from event.domains.event.repository import EventRepository
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from reservation.clients import EventClient
 from reservation.domains.reservation.messages import (
     ReservationCancelMessage,
     ReservationCreateMessage,
@@ -164,12 +164,12 @@ class ReservationWriteService:
     def __init__(
         self,
         *,
-        core_reader_session: AsyncSession,
+        event_client: EventClient,
         reservation_reader_session: AsyncSession,
         redis: Redis,
         sqs: SqsPublisher,
     ) -> None:
-        self._events = EventRepository(core_reader_session)
+        self._events = event_client
         self._reservations = ReservationRepository(reservation_reader_session)
         self._redis = redis
         self._sqs = sqs
@@ -180,22 +180,22 @@ class ReservationWriteService:
         user_id: UUID,
         payload: ReservationCreate,
     ) -> UUID:
-        # 1. 이벤트 존재 검증 (core RDS read)
-        event = await self._events.getById(payload.event_id)
-        if event is None:
+        # 1. 이벤트 존재 검증 (event 서비스 gRPC)
+        total_seats = await self._events.getTotalSeats(payload.event_id)
+        if total_seats is None:
             raise EventNotFoundError(event_id=str(payload.event_id))
 
         # 2. 좌석 번호 범위 검증 — 존재하지 않는 좌석을 SQS 에 넣지 않도록 사전 차단
-        if not 1 <= payload.reserved_num <= event.total_seats:
+        if not 1 <= payload.reserved_num <= total_seats:
             raise SeatOutOfRangeError(
                 event_id=str(payload.event_id),
                 reserved_num=payload.reserved_num,
-                total_seats=event.total_seats,
+                total_seats=total_seats,
             )
 
         # 3. Redis 잔여 카운터 (lazy init + 원자적 DECR) — 매진 차단
         remain_key = _remainKey(payload.event_id)
-        await self._redis.set(remain_key, event.total_seats, nx=True)
+        await self._redis.set(remain_key, total_seats, nx=True)
         remain = await self._redis.decr(remain_key)
         if remain < 0:
             await self._redis.incr(remain_key)  # 복구

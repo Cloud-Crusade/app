@@ -5,9 +5,9 @@ from common.errors import PaymentNotFoundError, ReservationNotFoundError
 from common.sqs import SqsPublisher
 from config.settings import settings
 from redis.asyncio import Redis
-from reservation.domains.reservation.service import ReservationReadService
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from payment.clients import ReservationClient
 from payment.domains.payment.messages import PaymentCreateMessage
 from payment.domains.payment.repository import PaymentRepository
 from payment.domains.payment.schema import PaymentCreate, PaymentRead
@@ -116,20 +116,19 @@ class PaymentWriteService:
     def __init__(
         self,
         *,
-        reservation_reader_session: AsyncSession,
+        reservation_client: ReservationClient,
         redis: Redis,
         sqs: SqsPublisher,
     ) -> None:
-        # reservation service 의 캐시 우선 조회를 재사용 (cache hit 우선 → DB 폴백)
-        self._reservations = ReservationReadService(reservation_reader_session, redis)
+        self._reservations = reservation_client
         self._redis = redis
         self._sqs = sqs
 
     async def requestCreate(self, *, user_id: UUID, payload: PaymentCreate) -> UUID:
-        # 결제 대상 예매 존재 검증 — 없으면 ReservationNotFoundError (캐시 우선 조회)
-        reservation = await self._reservations.getById(payload.reservation_id)
-        # 본인 소유 검증 — 없는 예매를 SQS 에 넣지 않도록 사전 차단
-        if reservation.user_id != user_id:
+        # 결제 대상 예매 존재·소유 검증 (reservation 서비스 gRPC)
+        owner_id = await self._reservations.getOwnerId(payload.reservation_id)
+        # 없는 예매·타인 예매를 SQS 에 넣지 않도록 사전 차단
+        if owner_id is None or owner_id != user_id:
             raise ReservationNotFoundError(reservation_id=str(payload.reservation_id))
 
         payment_history_id = uuid4()

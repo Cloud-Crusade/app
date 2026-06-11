@@ -43,5 +43,13 @@ class Settings(BaseSettings):
     captcha_hmac_secret: str = Field(default="", alias="CAPTCHA_HMAC_SECRET")
     captcha_complexity: int = Field(default=100_000, alias="CAPTCHA_COMPLEXITY")
 
+    # 서비스 간 gRPC — 서버 listen 포트 + 클라이언트 타깃
+    # 멀티 pod 는 dns:///<headless>:포트 형식으로 round_robin 분산
+    grpc_port: int = Field(default=50051, alias="GRPC_PORT")
+    event_grpc_target: str = Field(default="localhost:50051", alias="EVENT_GRPC_TARGET")
+    reservation_grpc_target: str = Field(
+        default="localhost:50051", alias="RESERVATION_GRPC_TARGET",
+    )
+
 
 settings = Settings()
