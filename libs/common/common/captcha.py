@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.settings import settings
+from common.settings import settings
 
 ALGORITHM = "SHA-256"
 CHALLENGE_TTL_SECONDS = 300

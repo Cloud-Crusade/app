@@ -4,7 +4,7 @@ from typing import Any
 import aioboto3
 import structlog
 
-from app.settings import settings
+from common.settings import settings
 
 logger = structlog.get_logger()
 

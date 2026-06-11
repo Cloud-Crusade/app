@@ -2,21 +2,22 @@ import uuid
 from contextlib import asynccontextmanager
 
 import structlog
+from common.dev_bootstrap import initDevSchemaIfEnabled
+from common.errors import DomainError
+from common.exception_handlers import (
+    domainErrorHandler,
+    integrityErrorHandler,
+    unhandledErrorHandler,
+    validationErrorHandler,
+)
+from common.logging import configureLogging
+from common.settings import settings
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.common.dev_bootstrap import initDevSchemaIfEnabled
-from app.common.errors import DomainError
-from app.common.exception_handlers import (
-    domainErrorHandler,
-    integrityErrorHandler,
-    unhandledErrorHandler,
-    validationErrorHandler,
-)
-from app.common.logging import configureLogging
 from app.routers import (
     auth,
     captcha,
@@ -27,7 +28,6 @@ from app.routers import (
     reservations,
     users,
 )
-from app.settings import settings
 
 configureLogging(env=settings.env)
 

@@ -1,14 +1,14 @@
 from typing import Annotated
 from uuid import UUID
 
+from common.deps import (
+    getCoreReaderSession,
+    getCoreWriterSession,
+)
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.deps import (
-    getCoreReaderSession,
-    getCoreWriterSession,
-    getCurrentUser,
-)
+from app.deps import getCurrentUser
 from app.domains.event.schema import (
     EventCreate,
     EventPage,

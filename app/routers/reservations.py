@@ -1,19 +1,19 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
-from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.common.deps import (
+from common.deps import (
     getCoreReaderSession,
-    getCurrentUser,
     getRedisClient,
     getReservationReaderSession,
     getReservationSqs,
     verifyReservationCaptcha,
 )
-from app.common.sqs import SqsPublisher
+from common.sqs import SqsPublisher
+from fastapi import APIRouter, Depends, Query, status
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.deps import getCurrentUser
 from app.domains.reservation.schema import (
     OccupiedSeats,
     ReservationAccepted,
@@ -144,7 +144,7 @@ async def getReservation(
     session: Annotated[AsyncSession, Depends(getReservationReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
 ) -> ReservationRead:
-    from app.common.errors import ReservationNotFoundError
+    from common.errors import ReservationNotFoundError
 
     reservation = await ReservationReadService(session, redis).getById(reservation_id)
     if reservation.user_id != user.user_id:

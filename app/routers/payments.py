@@ -1,18 +1,18 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
-from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.common.deps import (
-    getCurrentUser,
+from common.deps import (
     getRedisClient,
     getReservationReaderSession,
     getReservationSqs,
 )
-from app.common.errors import PaymentNotFoundError
-from app.common.sqs import SqsPublisher
+from common.errors import PaymentNotFoundError
+from common.sqs import SqsPublisher
+from fastapi import APIRouter, Depends, Query, status
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.deps import getCurrentUser
 from app.domains.payment.schema import (
     PaymentAccepted,
     PaymentCreate,

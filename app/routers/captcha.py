@@ -1,6 +1,5 @@
+from common.captcha import CaptchaChallenge, buildChallenge
 from fastapi import APIRouter
-
-from app.common.captcha import CaptchaChallenge, buildChallenge
 
 router = APIRouter(prefix="/captcha", tags=["captcha"])
 

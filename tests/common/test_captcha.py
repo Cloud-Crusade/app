@@ -3,10 +3,9 @@ import hashlib
 import json
 
 import pytest
-
-from app.common import captcha
-from app.common.captcha import CaptchaChallenge
-from app.settings import settings
+from common import captcha
+from common.captcha import CaptchaChallenge
+from common.settings import settings
 
 
 def _solve(challenge: CaptchaChallenge) -> str:

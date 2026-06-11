@@ -1,6 +1,6 @@
 import pytest
+from common.errors import DuplicateUserNameError, InvalidCredentialsError
 
-from app.common.errors import DuplicateUserNameError, InvalidCredentialsError
 from app.domains.user.schema import SignupRequest
 from app.domains.user.service import UserService
 

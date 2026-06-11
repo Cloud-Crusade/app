@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.common.errors import DomainError
+from common.errors import DomainError
 
 logger = structlog.get_logger()
 

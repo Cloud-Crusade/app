@@ -1,9 +1,8 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
-from app.common import dev_bootstrap
-from app.common.dev_bootstrap import initDevSchemaIfEnabled
+from common import dev_bootstrap
+from common.dev_bootstrap import initDevSchemaIfEnabled
 
 
 @pytest.mark.asyncio

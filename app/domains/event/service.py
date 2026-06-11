@@ -1,8 +1,8 @@
 from uuid import UUID
 
+from common.errors import EventNotFoundError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.errors import EventNotFoundError
 from app.domains.event.model import Event
 from app.domains.event.repository import EventRepository
 from app.domains.event.schema import EventCreate, EventUpdate

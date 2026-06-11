@@ -2,8 +2,8 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from common.errors import EventNotFoundError
 
-from app.common.errors import EventNotFoundError
 from app.domains.event.schema import EventCreate, EventUpdate, Schedule
 from app.domains.event.service import EventService
 

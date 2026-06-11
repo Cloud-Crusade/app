@@ -3,14 +3,14 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-
-from app.common.errors import (
+from common.errors import (
     EventNotFoundError,
     EventSoldOutError,
     ReservationNotFoundError,
     SeatAlreadyTakenError,
     SeatOutOfRangeError,
 )
+
 from app.domains.event.model import Event
 from app.domains.reservation.schema import ReservationCreate, ReservationRead
 from app.domains.reservation.service import (
@@ -327,7 +327,8 @@ async def test_request_cancel_pending_reservation_from_cache(coreSession, redis)
 @pytest.mark.asyncio
 async def test_request_cancel_already_canceled_raises_and_skips_publish(coreSession, redis):
     # 이미 취소된 예매 재취소 — 중복 발행 차단 (Lambda 좌석 카운터 이중 복구 방지)
-    from app.common.errors import ReservationAlreadyCanceledError
+    from common.errors import ReservationAlreadyCanceledError
+
     from app.domains.reservation.model import Reservation
 
     user_id = uuid4()
