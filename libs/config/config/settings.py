@@ -17,8 +17,15 @@ class Settings(BaseSettings):
     # 값은 서비스 배포 env 가 주입 (auth/event→RDS#1 role, reservation/payment→RDS#2 role)
     db_writer_url: str = Field(..., alias="DB_WRITER_URL")
     db_reader_url: str = Field(..., alias="DB_READER_URL")
+    # 엔드포인트 컷오버(CNAME/Proxy 타깃 변경) 시 풀 커넥션이 새 주소로 수렴하는 주기.
+    # 컷오버 운영 시 짧게 내려 빠르게 재연결(평시 30분)
+    db_pool_recycle_seconds: int = Field(default=1800, ge=1, alias="DB_POOL_RECYCLE_SECONDS")
 
     redis_url: str = Field(..., alias="REDIS_URL")
+    # ElastiCache 페일오버·엔드포인트 변경 시 idle 커넥션 재검증→재연결 주기 (DB pool_pre_ping 격)
+    redis_health_check_interval_seconds: int = Field(
+        default=30, ge=1, alias="REDIS_HEALTH_CHECK_INTERVAL_SECONDS",
+    )
 
     jwt_secret: str = Field(..., alias="JWT_SECRET")
     jwt_algorithm: str = "HS256"

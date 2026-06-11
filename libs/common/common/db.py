@@ -24,14 +24,16 @@ class TimestampMixin:
 
 
 def buildEngine(url: str) -> AsyncEngine:
-    # SQLite (테스트용) 는 풀 옵션을 받지 않음
+    # SQLite (테스트용) 는 풀 옵션을 받지 않음 — sqlite 경로는 DB env 없이도 동작하도록 지연 import
     if url.startswith("sqlite"):
         return create_async_engine(url)
+    from config.settings import settings
+
     return create_async_engine(
         url,
         pool_size=10,
         max_overflow=0,
-        pool_pre_ping=True,
-        pool_recycle=1800,
+        pool_pre_ping=True,  # 죽은 커넥션 감지 → 새 커넥션은 DNS 재해석(엔드포인트 컷오버 흡수)
+        pool_recycle=settings.db_pool_recycle_seconds,
         pool_timeout=2,
     )
