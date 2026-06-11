@@ -49,7 +49,8 @@ cc/infra 가 구현한다. 아래는 각 서비스가 정상 동작하기 위해
 
 ## 환경변수
 
-각 서비스 공통(`.env.example` 참조): `ENV`, `DB_WRITER_URL`, `DB_READER_URL`, `REDIS_URL`,
+각 서비스 공통(`.env.example` 참조): `ENV`, `DB_WRITER_URL`, `DB_READER_URL`,
+`DB_POOL_RECYCLE_SECONDS`, `REDIS_URL`, `REDIS_HEALTH_CHECK_INTERVAL_SECONDS`,
 `JWT_SECRET`, `SQS_RESERVATION_QUEUE_URL`, `GRPC_PORT`, 캡차·캐시 TTL 등. gRPC 타깃은 위 표 참조.
 
 ## 헬스체크

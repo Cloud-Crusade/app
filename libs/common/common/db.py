@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 
-from config.settings import settings
 from sqlalchemy import DateTime
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import Mapped, mapped_column
@@ -25,9 +24,11 @@ class TimestampMixin:
 
 
 def buildEngine(url: str) -> AsyncEngine:
-    # SQLite (테스트용) 는 풀 옵션을 받지 않음
+    # SQLite (테스트용) 는 풀 옵션을 받지 않음 — sqlite 경로는 DB env 없이도 동작하도록 지연 import
     if url.startswith("sqlite"):
         return create_async_engine(url)
+    from config.settings import settings
+
     return create_async_engine(
         url,
         pool_size=10,
