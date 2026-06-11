@@ -15,10 +15,14 @@ class ReservationServicer(reservation_pb2_grpc.ReservationServiceServicer):
         request: reservation_pb2.GetReservationRequest,
         context: grpc.aio.ServicerContext,
     ) -> reservation_pb2.GetReservationResponse:
+        try:
+            reservation_id = UUID(request.reservation_id)
+        except ValueError:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "invalid reservation_id")
         async with reservationReaderFactory() as session:
             service = ReservationReadService(session, buildRedis())
             try:
-                reservation = await service.getById(UUID(request.reservation_id))
+                reservation = await service.getById(reservation_id)
             except ReservationNotFoundError:
                 await context.abort(grpc.StatusCode.NOT_FOUND, "reservation not found")
         return reservation_pb2.GetReservationResponse(

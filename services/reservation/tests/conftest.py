@@ -17,4 +17,7 @@ class _FakeEventClient:
 @pytest.fixture
 def app():
     _app.dependency_overrides[getEventClient] = lambda: _FakeEventClient()
-    return _app
+    try:
+        yield _app
+    finally:
+        _app.dependency_overrides.pop(getEventClient, None)
