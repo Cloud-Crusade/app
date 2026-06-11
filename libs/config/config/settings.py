@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     db_pool_recycle_seconds: int = Field(default=1800, alias="DB_POOL_RECYCLE_SECONDS")
 
     redis_url: str = Field(..., alias="REDIS_URL")
+    # ElastiCache 페일오버·엔드포인트 변경 시 idle 커넥션 재검증→재연결 주기 (DB pool_pre_ping 격)
+    redis_health_check_interval_seconds: int = Field(
+        default=30, alias="REDIS_HEALTH_CHECK_INTERVAL_SECONDS",
+    )
 
     jwt_secret: str = Field(..., alias="JWT_SECRET")
     jwt_algorithm: str = "HS256"

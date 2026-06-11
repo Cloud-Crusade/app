@@ -38,6 +38,15 @@ cc/infra 가 구현한다. 아래는 각 서비스가 정상 동작하기 위해
 - 수렴 속도는 `DB_POOL_RECYCLE_SECONDS` 로 조절(컷오버 시 짧게, 평시 1800).
 - Multi-AZ 페일오버는 엔드포인트 DNS 가 고정이라 위 메커니즘으로 자동 처리(별도 조치 불필요).
 
+## ElastiCache (Redis) — 엔드포인트 컷오버
+
+- reservation·payment(좌석 hold·캐시·캡차 replay)가 사용. SQS 와 마찬가지로 **VPC 리소스가 아닌
+  관리형 서비스**지만, ElastiCache 는 private subnet 에 두므로 SG 로 EKS pod 접근만 허용.
+- `REDIS_URL` **호스트는 ElastiCache primary 엔드포인트(페일오버 시 DNS 고정)** 또는 고정 CNAME 권장.
+- 페일오버·엔드포인트 변경 시 앱은 `health_check_interval`(idle 커넥션 주기 검증 → 새 커넥션 DNS
+  재해석)로 자동 재연결. 주기는 `REDIS_HEALTH_CHECK_INTERVAL_SECONDS`(기본 30s).
+- Redis 다운 시 좌석 hold 는 DB row lock 으로 graceful fallback(04-rules).
+
 ## 환경변수
 
 각 서비스 공통(`.env.example` 참조): `ENV`, `DB_WRITER_URL`, `DB_READER_URL`, `REDIS_URL`,
