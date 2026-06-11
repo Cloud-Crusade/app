@@ -58,7 +58,10 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.detect.outputs.services) }}
     steps:
+      # 머지된 PR 은 실제 머지 커밋을 체크아웃 (github.sha 는 임시 merge ref). dispatch 는 github.sha
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - name: configure aws credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -75,7 +78,7 @@ jobs:
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPO: ticketing-${{ matrix.service }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
         run: |
           # 빌드 컨텍스트는 레포 루트 (Dockerfile 이 libs·services 를 워크스페이스로 COPY)
           docker build -f services/${{ matrix.service }}/Dockerfile -t "$REPO:$SHA" .
