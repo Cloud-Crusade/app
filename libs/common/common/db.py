@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 
+from config.settings import settings
 from sqlalchemy import DateTime
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import Mapped, mapped_column
@@ -31,7 +32,7 @@ def buildEngine(url: str) -> AsyncEngine:
         url,
         pool_size=10,
         max_overflow=0,
-        pool_pre_ping=True,
-        pool_recycle=1800,
+        pool_pre_ping=True,  # 죽은 커넥션 감지 → 새 커넥션은 DNS 재해석(엔드포인트 컷오버 흡수)
+        pool_recycle=settings.db_pool_recycle_seconds,
         pool_timeout=2,
     )

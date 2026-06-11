@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # 값은 서비스 배포 env 가 주입 (auth/event→RDS#1 role, reservation/payment→RDS#2 role)
     db_writer_url: str = Field(..., alias="DB_WRITER_URL")
     db_reader_url: str = Field(..., alias="DB_READER_URL")
+    # 엔드포인트 컷오버(CNAME/Proxy 타깃 변경) 시 풀 커넥션이 새 주소로 수렴하는 주기.
+    # 컷오버 운영 시 짧게 내려 빠르게 재연결(평시 30분)
+    db_pool_recycle_seconds: int = Field(default=1800, alias="DB_POOL_RECYCLE_SECONDS")
 
     redis_url: str = Field(..., alias="REDIS_URL")
 
