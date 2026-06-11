@@ -1,14 +1,14 @@
 [project]
 name = "cc-common"
 version = "0.1.0"
-description = "cc/app 서비스 공유 인프라 (db·redis·sqs·security·errors·logging·settings)"
+description = "cc/app 서비스 공유 인프라 (db·redis·sqs·security·errors·logging)"
 requires-python = ">=3.12"
 dependencies = [
+    "cc-config",
     "fastapi>=0.115",
     "sqlalchemy>=2.0",
     "asyncpg>=0.29",
     "pydantic>=2.7",
-    "pydantic-settings>=2.3",
     "pyjwt>=2.9",
     "bcrypt>=4.2",
     "redis>=5.0",
@@ -22,3 +22,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["common*"]
+
+[tool.uv.sources]
+cc-config = { workspace = true }

@@ -4,9 +4,9 @@ from uuid import UUID
 
 import bcrypt
 import jwt
+from config.settings import settings
 
 from common.errors import InvalidTokenError
-from common.settings import settings
 
 
 def hashPassword(raw: str) -> str:

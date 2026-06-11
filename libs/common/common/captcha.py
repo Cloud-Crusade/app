@@ -14,9 +14,8 @@ import secrets
 import time
 from typing import Any
 
+from config.settings import settings
 from pydantic import BaseModel
-
-from common.settings import settings
 
 ALGORITHM = "SHA-256"
 CHALLENGE_TTL_SECONDS = 300

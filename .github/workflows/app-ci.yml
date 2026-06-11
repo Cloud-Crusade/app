@@ -22,8 +22,8 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Sync workspace (+dev)
-        run: uv sync --extra dev
+      - name: Sync workspace (dev group 포함)
+        run: uv sync
 
       - name: Run pytest
         run: uv run pytest

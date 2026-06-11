@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from typing import Annotated
 
+from config.settings import settings
 from fastapi import Depends, Header
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,6 @@ from common.db import (
 )
 from common.errors import CaptchaError
 from common.redis import buildRedis
-from common.settings import settings
 from common.sqs import SqsPublisher, getReservationSqsPublisher
 
 

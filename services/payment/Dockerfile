@@ -1,0 +1,24 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install uv
+
+# 의존성 메타데이터 먼저 — 소스 변경이 third-party 설치 레이어를 무효화하지 않도록
+COPY pyproject.toml ./
+COPY libs/common/pyproject.toml ./libs/common/
+COPY libs/config/pyproject.toml ./libs/config/
+COPY services/event/pyproject.toml ./services/event/
+COPY services/reservation/pyproject.toml ./services/reservation/
+COPY services/payment/pyproject.toml ./services/payment/
+RUN uv sync --package cc-payment --no-install-workspace
+
+COPY libs ./libs
+COPY services/event ./services/event
+COPY services/reservation ./services/reservation
+COPY services/payment ./services/payment
+RUN uv sync --package cc-payment
+
+EXPOSE 8000
+
+CMD ["uv", "run", "--package", "cc-payment", "uvicorn", "payment.main:app", "--host", "0.0.0.0", "--port", "8000"]
