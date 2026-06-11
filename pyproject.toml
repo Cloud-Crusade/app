@@ -12,12 +12,13 @@ dev = [
     "aiosqlite>=0.20",
     "ruff>=0.5",
     "mypy>=1.10",
+    "alembic>=1.13",
 ]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["libs/protos/ccproto"]  # buf 생성 스텁 — lint/format 제외
+extend-exclude = ["libs/protos/ccproto", "services/*/alembic/versions"]  # 생성물(스텁·마이그레이션)
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "C4", "UP", "T20", "SIM", "RUF"]
@@ -39,4 +40,4 @@ addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-exclude = ["libs/protos/ccproto"]  # buf 생성 스텁
+exclude = ["libs/protos/ccproto", "alembic/versions"]  # 생성물(스텁·마이그레이션)
