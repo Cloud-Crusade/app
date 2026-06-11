@@ -1,30 +1,34 @@
-from unittest.mock import AsyncMock, patch
-
 import pytest
 from common import dev_bootstrap
 from common.dev_bootstrap import initDevSchemaIfEnabled
+from sqlalchemy import Column, Integer, MetaData, Table, inspect
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import StaticPool
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("env", ["production", "staging"])
-async def test_skipped_when_env_is_not_dev_or_test(env, monkeypatch):
+@pytest.mark.parametrize(
+    "env, should_create",
+    [
+        ("production", False),
+        ("staging", False),
+        ("development", True),
+        ("test", True),
+    ],
+)
+async def test_init_dev_schema_only_in_dev_or_test(env, should_create, monkeypatch):
     monkeypatch.setattr(dev_bootstrap.settings, "env", env)
-    create_all = AsyncMock()
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    metadata = MetaData()
+    Table("smoke_t", metadata, Column("id", Integer, primary_key=True))
 
-    with patch.object(dev_bootstrap, "_createAll", create_all):
-        await initDevSchemaIfEnabled()
+    await initDevSchemaIfEnabled(metadata, engine)
 
-    create_all.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("env", ["development", "test"])
-async def test_runs_create_all_when_env_is_dev_or_test(env, monkeypatch):
-    monkeypatch.setattr(dev_bootstrap.settings, "env", env)
-    create_all = AsyncMock()
-
-    with patch.object(dev_bootstrap, "_createAll", create_all):
-        await initDevSchemaIfEnabled()
-
-    # core + reservation 두 베이스에 대해 호출
-    assert create_all.await_count == 2
+    async with engine.connect() as conn:
+        names = await conn.run_sync(lambda c: inspect(c).get_table_names())
+    await engine.dispose()
+    assert ("smoke_t" in names) is should_create

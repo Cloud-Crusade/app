@@ -1,10 +1,8 @@
 import os
 
 # 테스트는 임의 환경변수로 settings 로드 (실제 DB 미사용)
-os.environ.setdefault("CORE_WRITER_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("CORE_READER_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("RESERVATION_WRITER_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("RESERVATION_READER_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("DB_WRITER_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("DB_READER_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("JWT_SECRET", "test-secret-" + "x" * 32)
 os.environ.setdefault("SQS_RESERVATION_QUEUE_URL", "http://test/reservation-queue")
@@ -16,36 +14,35 @@ from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
-from common.db import CoreBase, ReservationBase
-from common.deps import (
-    getCoreReaderSession,
-    getCoreWriterSession,
-    getRedisClient,
-    getReservationReaderSession,
-    getReservationSqs,
-    getReservationWriterSession,
-)
+from common.deps import getRedisClient, getReservationSqs
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 
+# serviceBase·sessionDeps 는 각 서비스의 tests/conftest.py 가 제공(override).
+@pytest.fixture
+def serviceBase():
+    raise RuntimeError("각 서비스 conftest 가 serviceBase 를 제공해야 합니다")
+
+
+@pytest.fixture
+def sessionDeps():
+    # (getReaderSession, getWriterSession) — 해당 서비스 db 의 세션 의존성
+    raise RuntimeError("각 서비스 conftest 가 sessionDeps 를 제공해야 합니다")
+
+
 @pytest_asyncio.fixture
-async def coreEngine():
+async def coreEngine(serviceBase):
     # StaticPool + 단일 SQLite in-memory connection 으로 매 세션이 동일 DB 를 본다.
-    # create_all 은 테스트가 import 한 서비스 모델만 생성한다(서비스별로 다름).
+    # 해당 서비스의 Base 테이블만 생성한다(서비스별 소유).
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     async with engine.begin() as conn:
-        await conn.run_sync(CoreBase.metadata.create_all)
-        await conn.run_sync(ReservationBase.metadata.create_all)
+        await conn.run_sync(serviceBase.metadata.create_all)
     yield engine
     await engine.dispose()
 
@@ -78,9 +75,10 @@ def sqsMock() -> AsyncMock:
 
 
 @pytest_asyncio.fixture
-async def client(app, coreSessionFactory, redis, sqsMock) -> AsyncIterator[AsyncClient]:
-    # app 은 각 서비스의 tests/conftest.py 가 제공 (해당 서비스 FastAPI 앱)
-    async def _core() -> AsyncIterator[AsyncSession]:
+async def client(
+    app, coreSessionFactory, redis, sqsMock, sessionDeps,
+) -> AsyncIterator[AsyncClient]:
+    async def _session() -> AsyncIterator[AsyncSession]:
         async with coreSessionFactory() as session:
             yield session
 
@@ -90,10 +88,9 @@ async def client(app, coreSessionFactory, redis, sqsMock) -> AsyncIterator[Async
     def _sqs():
         return sqsMock
 
-    app.dependency_overrides[getCoreWriterSession] = _core
-    app.dependency_overrides[getCoreReaderSession] = _core
-    app.dependency_overrides[getReservationWriterSession] = _core
-    app.dependency_overrides[getReservationReaderSession] = _core
+    reader_dep, writer_dep = sessionDeps
+    app.dependency_overrides[reader_dep] = _session
+    app.dependency_overrides[writer_dep] = _session
     app.dependency_overrides[getRedisClient] = _redis
     app.dependency_overrides[getReservationSqs] = _sqs
 

@@ -5,6 +5,7 @@ from connector.server import startServer
 from fastapi import FastAPI
 
 from reservation.clients import EventClient, setEventClient
+from reservation.db import Base, writerEngine
 from reservation.grpc_server import registerReservationService
 from reservation.routers import captcha, health, queue, reservations
 
@@ -32,6 +33,7 @@ if settings.env in {"development", "test"}:
 app = createApp(
     title="Reservation Service",
     routers=routers,
+    dev_schema=(Base.metadata, writerEngine),
     on_startup=_startup,
     on_shutdown=_shutdown,
 )

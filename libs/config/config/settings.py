@@ -13,10 +13,10 @@ class Settings(BaseSettings):
         alias="CORS_ALLOW_ORIGINS",
     )
 
-    core_writer_url: str = Field(..., alias="CORE_WRITER_URL")
-    core_reader_url: str = Field(..., alias="CORE_READER_URL")
-    reservation_writer_url: str = Field(..., alias="RESERVATION_WRITER_URL")
-    reservation_reader_url: str = Field(..., alias="RESERVATION_READER_URL")
+    # 서비스별 DB 연결 — 각 서비스가 자기 롤로 자기 테이블만 접근 (물리 DB 공유, GRANT 는 cc/infra).
+    # 값은 서비스 배포 env 가 주입 (auth/event→RDS#1 role, reservation/payment→RDS#2 role)
+    db_writer_url: str = Field(..., alias="DB_WRITER_URL")
+    db_reader_url: str = Field(..., alias="DB_READER_URL")
 
     redis_url: str = Field(..., alias="REDIS_URL")
 

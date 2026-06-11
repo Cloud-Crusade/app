@@ -4,7 +4,6 @@ from uuid import UUID
 from common.auth import getCurrentUserId
 from common.deps import (
     getRedisClient,
-    getReservationReaderSession,
     getReservationSqs,
 )
 from common.errors import PaymentNotFoundError
@@ -14,6 +13,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from payment.clients import ReservationClient, getReservationClient
+from payment.db import getReaderSession
 from payment.domains.payment.schema import (
     PaymentAccepted,
     PaymentCreate,
@@ -58,7 +58,7 @@ async def createPayment(
 )
 async def listMyPayments(
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    session: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    session: Annotated[AsyncSession, Depends(getReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -81,7 +81,7 @@ async def listMyPayments(
 async def getPayment(
     payment_history_id: UUID,
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    session: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    session: Annotated[AsyncSession, Depends(getReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
 ) -> PaymentRead:
     payment = await PaymentReadService(session, redis).getById(payment_history_id)

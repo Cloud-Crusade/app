@@ -2,10 +2,10 @@ from uuid import UUID
 
 import grpc
 from ccproto.reservation.v1 import reservation_pb2, reservation_pb2_grpc
-from common.db import reservationReaderFactory
 from common.errors import ReservationNotFoundError
 from common.redis import buildRedis
 
+from reservation.db import readerFactory
 from reservation.domains.reservation.service import ReservationReadService
 
 
@@ -19,7 +19,7 @@ class ReservationServicer(reservation_pb2_grpc.ReservationServiceServicer):
             reservation_id = UUID(request.reservation_id)
         except ValueError:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "invalid reservation_id")
-        async with reservationReaderFactory() as session:
+        async with readerFactory() as session:
             service = ReservationReadService(session, buildRedis())
             try:
                 reservation = await service.getById(reservation_id)

@@ -2,8 +2,8 @@ from uuid import UUID
 
 import grpc
 from ccproto.event.v1 import event_pb2, event_pb2_grpc
-from common.db import coreReaderFactory
 
+from event.db import readerFactory
 from event.domains.event.repository import EventRepository
 
 
@@ -17,7 +17,7 @@ class EventServicer(event_pb2_grpc.EventServiceServicer):
             event_id = UUID(request.event_id)
         except ValueError:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "invalid event_id")
-        async with coreReaderFactory() as session:
+        async with readerFactory() as session:
             event = await EventRepository(session).getById(event_id)
         if event is None:
             await context.abort(grpc.StatusCode.NOT_FOUND, "event not found")

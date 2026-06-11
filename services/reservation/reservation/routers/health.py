@@ -1,10 +1,12 @@
 from typing import Annotated
 
-from common.deps import getRedisClient, getReservationReaderSession
+from common.deps import getRedisClient
 from fastapi import APIRouter, Depends, HTTPException
 from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from reservation.db import getReaderSession
 
 router = APIRouter(tags=["health"])
 
@@ -20,7 +22,7 @@ async def liveness() -> dict[str, str]:
     responses={503: {"description": "의존성 미준비"}},
 )
 async def readiness(
-    reservation: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    reservation: Annotated[AsyncSession, Depends(getReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
 ) -> dict[str, str]:
     try:

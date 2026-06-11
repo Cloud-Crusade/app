@@ -1,18 +1,19 @@
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from common.db import CoreBase
 from sqlalchemy import JSON, Date, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
+from event.db import Base
+
 # 운영(Postgres)은 JSONB, 테스트(SQLite) 등은 일반 JSON 으로 fallback
 _JsonField = JSON().with_variant(JSONB(), "postgresql")
 
 
-class Event(CoreBase):
+class Event(Base):
     __tablename__ = "events"
 
     event_id: Mapped[UUID] = mapped_column(

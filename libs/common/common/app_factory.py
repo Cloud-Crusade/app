@@ -8,7 +8,9 @@ from config.settings import settings
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncEngine
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -39,13 +41,16 @@ def createApp(
     *,
     title: str,
     routers: Sequence[APIRouter],
+    dev_schema: tuple[MetaData, AsyncEngine] | None = None,
     on_startup: Callable[[FastAPI], Awaitable[None]] | None = None,
     on_shutdown: Callable[[FastAPI], Awaitable[None]] | None = None,
     **kwargs: Any,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        await initDevSchemaIfEnabled()
+        # dev/test 한정 — 서비스 자기 Base 테이블 생성
+        if dev_schema is not None:
+            await initDevSchemaIfEnabled(*dev_schema)
         if on_startup is not None:
             await on_startup(app)
         try:

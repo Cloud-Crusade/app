@@ -4,7 +4,6 @@ from uuid import UUID
 from common.auth import getCurrentUserId
 from common.deps import (
     getRedisClient,
-    getReservationReaderSession,
     getReservationSqs,
     verifyReservationCaptcha,
 )
@@ -14,6 +13,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reservation.clients import EventClient, getEventClient
+from reservation.db import getReaderSession
 from reservation.domains.reservation.schema import (
     OccupiedSeats,
     ReservationAccepted,
@@ -48,7 +48,7 @@ async def createReservation(
     # 인증(getCurrentUserId) 이후에 평가되도록 시그니처에 둠 — 미인증은 401 이 우선
     _captcha: Annotated[None, Depends(verifyReservationCaptcha)],
     event_client: Annotated[EventClient, Depends(getEventClient)],
-    reservation_reader: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    reservation_reader: Annotated[AsyncSession, Depends(getReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
     sqs: Annotated[SqsPublisher, Depends(getReservationSqs)],
 ) -> ReservationAccepted:
@@ -77,7 +77,7 @@ async def cancelReservation(
     reservation_id: UUID,
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
     event_client: Annotated[EventClient, Depends(getEventClient)],
-    reservation_reader: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    reservation_reader: Annotated[AsyncSession, Depends(getReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
     sqs: Annotated[SqsPublisher, Depends(getReservationSqs)],
 ) -> ReservationAccepted:
@@ -99,7 +99,7 @@ async def cancelReservation(
 )
 async def listMyReservations(
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    session: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    session: Annotated[AsyncSession, Depends(getReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -121,7 +121,7 @@ async def listMyReservations(
 async def listOccupiedSeats(
     event_id: UUID,
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    session: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    session: Annotated[AsyncSession, Depends(getReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
 ) -> OccupiedSeats:
     occupied = await ReservationReadService(session, redis).occupiedSeats(event_id)
@@ -140,7 +140,7 @@ async def listOccupiedSeats(
 async def getReservation(
     reservation_id: UUID,
     user_id: Annotated[UUID, Depends(getCurrentUserId)],
-    session: Annotated[AsyncSession, Depends(getReservationReaderSession)],
+    session: Annotated[AsyncSession, Depends(getReaderSession)],
     redis: Annotated[Redis, Depends(getRedisClient)],
 ) -> ReservationRead:
     from common.errors import ReservationNotFoundError
