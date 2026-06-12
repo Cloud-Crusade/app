@@ -80,7 +80,7 @@ jobs:
           REPO: ticketing-${{ matrix.service }}
           SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
         run: |
-          # 빌드 컨텍스트는 레포 루트 (Dockerfile 이 libs·services 를 워크스페이스로 COPY)
+          # 빌드 컨텍스트는 레포 루트 (서비스 Dockerfile 이 libs·services 워크스페이스를 COPY)
           docker build -f services/${{ matrix.service }}/Dockerfile -t "$REPO:$SHA" .
           docker tag "$REPO:$SHA" "$REGISTRY/$REPO:$SHA"
           docker tag "$REPO:$SHA" "$REGISTRY/$REPO:latest"
