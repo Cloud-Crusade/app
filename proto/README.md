@@ -1,19 +1,21 @@
 # proto
 
-서비스 간 gRPC 계약의 단일 진실원. 패키지는 `<service>.v<n>` 규칙을 따른다.
+서비스 간 gRPC 계약의 단일 진실원. 패키지는 `ccproto.<service>.v<n>` 규칙을 따른다
+(공통 네임스페이스 `ccproto` 로 생성 스텁의 import 충돌 회피).
 
 ```
 proto/
-  auth/v1/         # 인증 서비스
-  event/v1/        # 행사 관리 서비스
-  reservation/v1/  # 예약 관리 서비스
-  payment/v1/      # 결제 관리 서비스
+  ccproto/
+    auth/v1/         # 인증 서비스
+    event/v1/        # 행사 관리 서비스
+    reservation/v1/  # 예약 관리 서비스
+    payment/v1/      # 결제 관리 서비스
 ```
 
 ## 스텁 생성
 
 ```bash
-buf generate          # gen/python/ 에 생성 (gitignore 대상)
+buf generate          # libs/protos 에 생성 (cc-protos 패키지로 커밋)
 ```
 
 ## 검증
