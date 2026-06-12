@@ -8,6 +8,8 @@ RUN pip install uv
 COPY pyproject.toml ./
 COPY libs/common/pyproject.toml ./libs/common/
 COPY libs/config/pyproject.toml ./libs/config/
+COPY libs/connector/pyproject.toml ./libs/connector/
+COPY libs/protos/pyproject.toml ./libs/protos/
 COPY services/event/pyproject.toml ./services/event/
 RUN uv sync --package cc-event --no-install-workspace
 
