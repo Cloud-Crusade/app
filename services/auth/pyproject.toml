@@ -1,0 +1,19 @@
+[project]
+name = "cc-auth"
+version = "0.1.0"
+description = "인증 서비스 (회원가입·로그인·JWT·프로필)"
+requires-python = ">=3.12"
+dependencies = [
+    "cc-common",
+    "uvicorn[standard]>=0.30",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["auth*"]
+
+[tool.uv.sources]
+cc-common = { workspace = true }

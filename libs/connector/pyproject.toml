@@ -1,0 +1,15 @@
+[project]
+name = "cc-connector"
+version = "0.1.0"
+description = "서비스 간 gRPC 연결 풀 — 멀티 pod round_robin 분산 + 채널 재사용"
+requires-python = ">=3.12"
+dependencies = [
+    "grpcio>=1.66",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["connector*"]

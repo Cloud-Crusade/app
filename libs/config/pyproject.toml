@@ -1,0 +1,16 @@
+[project]
+name = "cc-config"
+version = "0.1.0"
+description = "cc/app 서비스 공유 설정 (환경변수 기반 Settings)"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["config*"]
