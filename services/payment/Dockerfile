@@ -8,14 +8,12 @@ RUN pip install uv
 COPY pyproject.toml ./
 COPY libs/common/pyproject.toml ./libs/common/
 COPY libs/config/pyproject.toml ./libs/config/
-COPY services/event/pyproject.toml ./services/event/
-COPY services/reservation/pyproject.toml ./services/reservation/
+COPY libs/connector/pyproject.toml ./libs/connector/
+COPY libs/protos/pyproject.toml ./libs/protos/
 COPY services/payment/pyproject.toml ./services/payment/
 RUN uv sync --package cc-payment --no-install-workspace
 
 COPY libs ./libs
-COPY services/event ./services/event
-COPY services/reservation ./services/reservation
 COPY services/payment ./services/payment
 RUN uv sync --package cc-payment
 
