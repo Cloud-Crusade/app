@@ -86,3 +86,9 @@ jobs:
           docker tag "$REPO:$SHA" "$REGISTRY/$REPO:latest"
           docker push "$REGISTRY/$REPO:$SHA"
           docker push "$REGISTRY/$REPO:latest"
+
+      - name: deploy to eks
+        if: ${{ vars.EKS_ENABLED == 'true' }}
+        run: |
+          aws eks update-kubeconfig --region ap-northeast-2 --name ${{ vars.EKS_CLUSTER_NAME }}
+          kubectl rollout restart deployment/ticketing-${{ matrix.service }} -n ticketing
