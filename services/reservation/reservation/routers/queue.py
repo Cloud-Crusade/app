@@ -19,11 +19,16 @@ router = APIRouter(prefix="/queue", tags=["queue"])
 _ADMIT_AFTER_POLLS = 3
 # (event_id, user_id) -> 남은 대기 폴링 수
 _queue_state: dict[tuple[str, str], int] = {}
+# (event_id, user_id) -> 발급된 대기 번호 (폴링 간 고정)
+_queue_numbers: dict[tuple[str, str], int] = {}
+# event_id -> 대기 번호 발급 카운터 (운영의 INCR 모사)
+_issued: dict[str, int] = {}
 
 
 class QueueData(BaseModel):
     token: str | None = None
-    position: int | None = None
+    queue_number: int | None = None
+    remaining: int | None = None
 
 
 class QueueStatusResponse(BaseModel):
@@ -54,10 +59,15 @@ async def getQueueStatus(
             data=QueueData(token=f"dev-queue.{event_id}.{user_id}"),
         )
 
-    # 대기 — 폴링마다 순번 감소
+    # 대기 — 최초 접촉 시 대기 번호 발급(운영의 INCR 모사), 폴링마다 남은 인원 감소
+    queue_number = _queue_numbers.get(key)
+    if queue_number is None:
+        queue_number = _issued.get(event_id, 0) + 1
+        _issued[event_id] = queue_number
+        _queue_numbers[key] = queue_number
     _queue_state[key] = remaining - 1
     return QueueStatusResponse(
         code="WAITING",
         message="현재 대기열",
-        data=QueueData(position=remaining),
+        data=QueueData(queue_number=queue_number, remaining=remaining),
     )

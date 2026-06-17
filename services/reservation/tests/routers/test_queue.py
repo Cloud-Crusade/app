@@ -15,7 +15,9 @@ async def test_get_queue_waits_then_completes_with_token(client):
     first = await client.get("/queue/ev-1", headers=headers)
     assert first.status_code == 200
     assert first.json()["code"] == "WAITING"
-    assert first.json()["data"]["position"] >= 1
+    data = first.json()["data"]
+    assert data["queue_number"] >= 1
+    assert data["remaining"] >= 1
 
     last = first.json()
     for _ in range(10):
