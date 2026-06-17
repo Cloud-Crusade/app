@@ -1,0 +1,25 @@
+[project]
+name = "cc-payment"
+version = "0.1.0"
+description = "결제 관리 서비스 (결제 기록·조회, Mock)"
+requires-python = ">=3.12"
+dependencies = [
+    "cc-common",
+    "cc-config",
+    "cc-connector",
+    "cc-protos",
+    "uvicorn[standard]>=0.30",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["payment*"]
+
+[tool.uv.sources]
+cc-common = { workspace = true }
+cc-config = { workspace = true }
+cc-connector = { workspace = true }
+cc-protos = { workspace = true }

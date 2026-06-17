@@ -1,0 +1,17 @@
+[project]
+name = "cc-protos"
+version = "0.1.0"
+description = "gRPC 생성 스텁 (buf generate 산출물, ccproto.*)"
+requires-python = ">=3.12"
+# 생성 스텁이 런타임 버전 검사(protobuf 7.35)를 하므로 메이저 일치 고정
+dependencies = [
+    "protobuf>=7.35,<8",
+    "grpcio>=1.66",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["ccproto*"]

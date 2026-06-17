@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - "feature/#44/msa-monorepo"   # MSA 통합 브랜치로 향하는 단계별 PR 도 테스트
 
 jobs:
   test:
@@ -21,9 +22,8 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      - name: Install packages
-        run: |
-          uv pip install --system ".[dev]"
+      - name: Sync workspace (dev group 포함)
+        run: uv sync
 
       - name: Run pytest
-        run: pytest
+        run: uv run pytest

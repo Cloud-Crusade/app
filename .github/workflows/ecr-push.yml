@@ -9,13 +9,59 @@ on:
     types: [closed]
 
 jobs:
-  push:
+  # 변경된 서비스 판별 — 공유(libs/proto) 변경 시 전체, 수동 트리거 시 전체
+  detect:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-
+    outputs:
+      services: ${{ steps.select.outputs.services }}
     steps:
-      - name: checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            shared:
+              - 'libs/**'
+              - 'proto/**'
+              - 'pyproject.toml'
+            auth: ['services/auth/**']
+            event: ['services/event/**']
+            reservation: ['services/reservation/**']
+            payment: ['services/payment/**']
+
+      - id: select
+        run: |
+          # 수동 트리거 또는 공유 코드(libs·proto) 변경 → 전 서비스 재빌드
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+             || [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
+            echo 'services=["auth","event","reservation","payment"]' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sel=()
+          [ "${{ steps.filter.outputs.auth }}" = "true" ] && sel+=(auth)
+          [ "${{ steps.filter.outputs.event }}" = "true" ] && sel+=(event)
+          [ "${{ steps.filter.outputs.reservation }}" = "true" ] && sel+=(reservation)
+          [ "${{ steps.filter.outputs.payment }}" = "true" ] && sel+=(payment)
+          json=$(printf '%s\n' "${sel[@]}" | jq -R . | jq -cs .)
+          echo "services=${json}" >> "$GITHUB_OUTPUT"
+
+  push:
+    needs: detect
+    if: needs.detect.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJSON(needs.detect.outputs.services) }}
+    steps:
+      # 머지된 PR 은 실제 머지 커밋을 체크아웃 (github.sha 는 임시 merge ref). dispatch 는 github.sha
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - name: configure aws credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -28,17 +74,21 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: build image
-        run: docker build -t ticketing-app .
-
-      - name: tag image
-        run: docker tag ticketing-app:latest ${{ steps.login-ecr.outputs.registry }}/ticketing-app:latest
-
-      - name: push image
-        run: docker push ${{ steps.login-ecr.outputs.registry }}/ticketing-app:latest
+      - name: build · tag · push
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO: ${{ vars.ECR_NAMESPACE }}/${{ matrix.service }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+        run: |
+          # 빌드 컨텍스트는 레포 루트 (서비스 Dockerfile 이 libs·services 워크스페이스를 COPY)
+          docker build -f services/${{ matrix.service }}/Dockerfile -t "$REPO:$SHA" .
+          docker tag "$REPO:$SHA" "$REGISTRY/$REPO:$SHA"
+          docker tag "$REPO:$SHA" "$REGISTRY/$REPO:latest"
+          docker push "$REGISTRY/$REPO:$SHA"
+          docker push "$REGISTRY/$REPO:latest"
 
       - name: deploy to eks
         if: ${{ vars.EKS_ENABLED == 'true' }}
         run: |
-          aws eks update-kubeconfig --region ap-northeast-2 --name cc-dev-eks
-          kubectl rollout restart deployment/ticketing-app -n default
+          aws eks update-kubeconfig --region ap-northeast-2 --name ${{ vars.EKS_CLUSTER_NAME }}
+          kubectl rollout restart deployment/ticketing-${{ matrix.service }} -n ticketing

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package ccproto.event.v1;
+
+// 예약 서비스가 좌석 검증을 위해 호출 (#48: reservation→event 직접호출 대체)
+service EventService {
+  rpc GetEvent(GetEventRequest) returns (GetEventResponse);
+}
+
+message GetEventRequest {
+  string event_id = 1;
+}
+
+message GetEventResponse {
+  string event_id = 1;
+  int32 total_seats = 2;
+}

@@ -1,0 +1,36 @@
+name: Proto CI
+
+on:
+  pull_request:
+    paths:
+      - "proto/**"
+      - "buf.yaml"
+      - "buf.gen.yaml"
+      - ".github/workflows/proto-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  buf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - run: buf lint
+      - run: buf format --diff --exit-code
+      - name: breaking
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          # 기준 커밋이 ccproto 네임스페이스를 가질 때만 비교.
+          # buf.yaml 부재=부트스트랩, ccproto 부재=네임스페이스 마이그레이션 PR → 생략
+          if git cat-file -e "$base:buf.yaml" 2>/dev/null \
+             && git ls-tree -d "$base" proto/ccproto 2>/dev/null | grep -q ccproto; then
+            buf breaking --against ".git#format=git,commit=$base"
+          else
+            echo "기준 커밋에 ccproto 모듈 없음 — breaking 생략"
+          fi
