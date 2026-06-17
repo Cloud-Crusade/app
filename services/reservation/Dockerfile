@@ -17,6 +17,12 @@ COPY libs ./libs
 COPY services/reservation ./services/reservation
 RUN uv sync --package cc-reservation
 
+# 비루트 사용자(uid 10001) — k8s securityContext.runAsUser 와 일치. -m 으로 홈 생성해 uv 캐시 쓰기 가능
+RUN useradd -u 10001 -m appuser && chown -R appuser:appuser /app
+ENV HOME=/home/appuser \
+    UV_CACHE_DIR=/home/appuser/.cache/uv
+USER 10001
+
 EXPOSE 8000
 
 CMD ["uv", "run", "--package", "cc-reservation", "uvicorn", "reservation.main:app", "--host", "0.0.0.0", "--port", "8000"]
